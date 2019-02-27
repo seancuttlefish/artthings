@@ -8,7 +8,7 @@ The project began as a set of technologies used by artist Sean Clark (http://www
 
 ## Goals
 
-The goal of the artThings project is to take the groundwork done by Sean Clark and produce an open infrastructure based around MQTT that can be used by other artists to enable their digital artworks to communicate and share information. We want artThings to be simple to use, work across multiple platforms and facilitate the creation of new and exciting forms of digital art.
+The goal of the artThings project is to take the groundwork done by Sean Clark and produce an open infrastructure, based around MQTT, that can be used by other artists to enable their digital artworks to communicate and share information. We want artThings to be simple to use, work across multiple platforms and facilitate the creation of new and exciting forms of digital art.
 
 A secondary goal is to set up a secure Mosquitto MQTT broker for use by artists and artworks using artThings. Such a server will allow artists to make use of artThings without having to set-up their own messaging server. Agreeing a standard approach to WiFi network sharing by artworks may also form part of this work.
 
