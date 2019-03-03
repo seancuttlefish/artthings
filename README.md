@@ -1,6 +1,6 @@
 # artThings - The Internet of Art Things
 
-The Internet of Art Things, or simply artThings (http://interactdigitalarts.uk/artthings), is an infrastructure for creating connected digital artworks. It allows artworks that use micro-controllers, computers and web bwowsers to exchange data to respond to sensors. artThings makes use of MQTT, a lightweight and flexible messaging system that works on many different types of device and network.
+The Internet of Art Things, or simply artThings (http://interactdigitalarts.uk/artthings), is an infrastructure for creating connected digital artworks. It allows artworks that use micro-controllers, computers and web browsers to exchange data to respond to sensors. artThings makes use of MQTT, a lightweight and flexible messaging system that works on many different types of device and network.
 
 ## Beginnings
 
