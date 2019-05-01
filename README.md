@@ -17,7 +17,7 @@ A secondary goal is to set up a secure Mosquitto MQTT broker for use by artists 
 In order to achieve our goals we need to:
 
 - Describe and share the current artThings technology under an open licence.
-- Find artists and technologist who are interested in the project and want to sign up to help it develop futher.
+- Find artists and technologist who are interested in the project and want to sign up to help it develop further.
 - Define standards for message topics and payloads and agree a mechanism for extending these further.
 - Develop code examples and boiler-plate code to help artists make use of the technology in their own work.
 - Set-up/fund a shared MQTT broker (using Mosqitto) for use by artists using artThings.
