@@ -24,4 +24,4 @@ In order to achieve our goals we need to:
 
 ## Your Next Step
 
-Join the artThings community.
+Join the artThings community here on GitHub. Email seanc@cuttlefish or follow @seancuttlefish on Twitter.
