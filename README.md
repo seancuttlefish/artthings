@@ -20,7 +20,7 @@ In order to achieve our goals we need to:
 - Find artists and technologist who are interested in the project and want to sign up to help it develop further.
 - Define standards for message topics and payloads and agree a mechanism for extending these further.
 - Develop code examples and boiler-plate code to help artists make use of the technology in their own work.
-- Set-up/fund a shared MQTT broker (using Mosqitto) for use by artists using artThings.
+- Set-up/fund a shared MQTT broker (using Mosquitto) for use by artists using artThings.
 
 ## Your Next Step
 
