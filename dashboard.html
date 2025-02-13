@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>MQTT Traffic Monitor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        .traffic-container {
+            margin: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+        }
+
+        .message {
+            margin: 5px 0;
+            padding: 8px;
+            background-color: #f0f0f0;
+        }
+
+        .publish-container {
+            margin-top: 20px;
+            padding: 10px;
+            border-top: 1px solid #ccc;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="traffic-container">
+        <h2>MQTT Traffic Monitor</h2>
+        <div>
+            <label>Broker URL:</label>
+            <input type="text" id="broker" value="iot.artthings.io">
+            <label>Port:</label>
+            <input type="number" id="port" value="8884">
+            <label>Topic:</label>
+            <input type="text" id="topic" value="#">
+            <button onclick="connect()">Connect</button>
+        </div>
+        <div id="status"></div>
+
+        <!-- New publish message section -->
+        <div class="publish-container">
+            <h3>Publish Message</h3>
+            <div>
+                <label>Publish Topic:</label>
+                <input type="text" id="publishTopic" value="">
+                <label>Message:</label>
+                <input type="text" id="publishMessage" value="">
+                <button onclick="publishMessage()">Publish</button>
+            </div>
+        </div>
+
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        var client;
+        var messageDiv = document.getElementById('messages');
+        var statusDiv = document.getElementById('status');
+
+        function connect() {
+            var broker = document.getElementById('broker').value;
+            var port = parseInt(document.getElementById('port').value);
+            var topic = document.getElementById('topic').value;
+
+            client = new Paho.MQTT.Client(broker, port, "clientId-" + Math.random());
+
+            client.onConnectionLost = function (responseObject) {
+                if (responseObject.errorCode !== 0) {
+                    statusDiv.innerHTML = "Connection lost: " + responseObject.errorMessage;
+                }
+            };
+
+            client.onMessageArrived = function (message) {
+                var msgElement = document.createElement('div');
+                msgElement.className = 'message';
+                msgElement.innerHTML = `Topic: ${message.destinationName}<br>Message: ${message.payloadString}`;
+                messageDiv.insertBefore(msgElement, messageDiv.firstChild);
+            };
+
+            client.connect({
+                useSSL: true,
+                onSuccess: function () {
+                    statusDiv.innerHTML = "Connected to " + broker;
+                    client.subscribe(topic);
+                },
+                onFailure: function (message) {
+                    statusDiv.innerHTML = "Connection failed: " + message.errorMessage;
+                }
+            });
+        }
+
+        // New function to publish messages
+        function publishMessage() {
+            if (!client || !client.isConnected()) {
+                alert("Please connect to broker first!");
+                return;
+            }
+
+            var topic = document.getElementById('publishTopic').value;
+            var message = document.getElementById('publishMessage').value;
+
+            if (!topic || !message) {
+                alert("Please enter both topic and message!");
+                return;
+            }
+
+            var mqttMessage = new Paho.MQTT.Message(message);
+            mqttMessage.destinationName = topic;
+            client.send(mqttMessage);
+
+            // Add the sent message to the messages div
+            var msgElement = document.createElement('div');
+            msgElement.className = 'message';
+            msgElement.innerHTML = `<strong>Sent</strong><br>Topic: ${topic}<br>Message: ${message}`;
+            messageDiv.insertBefore(msgElement, messageDiv.firstChild);
+        }
+    </script>
+</body>
+
+</html>
