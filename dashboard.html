@@ -2,10 +2,10 @@
 <html>
 
 <head>
-    <title>MQTT Traffic Monitor</title>
+    <title>artThings Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
-        .traffic-container {
+        .connection-container {
             margin: 20px;
             padding: 15px;
             border: 1px solid #ccc;
@@ -17,7 +17,7 @@
             background-color: #f0f0f0;
         }
 
-        .publish-container {
+        .message-container {
             margin-top: 20px;
             padding: 10px;
             border-top: 1px solid #ccc;
@@ -26,8 +26,8 @@
 </head>
 
 <body>
-    <div class="traffic-container">
-        <h2>MQTT Traffic Monitor</h2>
+    <div class="connection-container">
+        <h2>artThings Dashboard</h2>
         <div>
             <label>Broker URL:</label>
             <input type="text" id="broker" value="iot.artthings.io">
@@ -39,15 +39,14 @@
         </div>
         <div id="status"></div>
 
-        <!-- New publish message section -->
-        <div class="publish-container">
-            <h3>Publish Message</h3>
+        <div class="message-container">
+            <h3>Message</h3>
             <div>
-                <label>Publish Topic:</label>
+                <label> Topic:</label>
                 <input type="text" id="publishTopic" value="">
                 <label>Message:</label>
                 <input type="text" id="publishMessage" value="">
-                <button onclick="publishMessage()">Publish</button>
+                <button onclick="publishMessage()">Send</button>
             </div>
         </div>
 
