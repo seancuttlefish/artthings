@@ -30,9 +30,9 @@
         <h2>artThings Dashboard</h2>
         <div>
             <label>Broker URL:</label>
-            <input type="text" id="broker" value="iot.artthings.io">
+            <input type="text" id="broker" value="localhost">
             <label>Port:</label>
-            <input type="number" id="port" value="8884">
+            <input type="number" id="port" value="1883">
             <label>Topic:</label>
             <input type="text" id="topic" value="#">
             <button onclick="connect()">Connect</button>
@@ -79,7 +79,7 @@
             };
 
             client.connect({
-                useSSL: true,
+                useSSL: false,
                 onSuccess: function () {
                     statusDiv.innerHTML = "Connected to " + broker;
                     client.subscribe(topic);
