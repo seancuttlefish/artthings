@@ -1,0 +1,287 @@
+<!--
+	6th January 2024
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+	1124.1 - Sean Clark
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="robots" content="noindex">
+	<title>0124.1 - Sean Clark</title>
+	<meta http-equiv="refresh" content="3600">
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-title" content="0124.1">
+	<meta name="apple-mobile-web-app-status-bar-style" content="white-translucent">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+	<script type="text/javascript" src="js/jquery.min.js"></script>
+	<script type="text/javascript" src="js/raphael.min.js"></script>
+	<script type="text/javascript" src="js/elements.js"></script>
+	<script type="text/javascript" src="js/palette.js"></script>
+	<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+	<style type="text/css">
+		body {
+			overscroll-behavior-y: contain;
+			font-family: sans-serif;
+			background-color: #000;
+			-webkit-user-select: none;
+			-webkit-touch-callout: none;
+			margin: 0;
+			padding: 0;
+			overflow: hidden;
+		}
+		#canvas {
+			position: absolute;
+			background-color: #000;
+			margin: 9 auto;
+			border: 1px solid #000;
+			cursor: none;
+		}
+	</style>
+</head>
+<body>
+	<div id="canvas"></div>
+
+	<script type="text/javascript">
+
+$(document).ready(function() {
+	setup();
+	draw();
+});
+
+let title="0124.1";
+let canvas_width = window.innerWidth
+let canvas_height = window.innerHeight;
+let systems_width = 8;
+let systems_height = 8;
+let canvas = new Raphael(document.getElementById('canvas'),canvas_width,canvas_height);
+
+let box_x, box_y;
+let box_w = 0;
+let box_h = 0;
+let x = 0;
+let y = 0;
+let h, s, l;
+let pos = 0;
+let hslcolour, bgcolour, value;
+
+let background = 0; // #000, #555, #aaa, #fff
+let filter = 0; // all, wide, narrow
+let shape = 0;
+let order = 0; // I, H, S, L
+
+let stroke_width = 8;
+let stroke_height = 8;
+let stroke_thickness = 0;
+
+let min_l = 0;
+let max_l = 100;
+let min_s = 0;
+let max_s = 100;
+
+// Setup
+function setup() {
+}
+
+// Redraw
+function draw() {
+	//canvas.clear();
+
+	canvas_width = window.innerWidth
+	canvas_height = window.innerHeight;
+	system_width = canvas_width/systems_width;
+	system_height = canvas_height/systems_height;
+
+	console.log("Canvas: "+canvas_width+"x"+canvas_height);
+	console.log("System: "+system_width+"x"+system_height);
+
+	canvas.setSize(canvas_width, canvas_height);
+
+	x = Math.floor(Math.random()*systems_width);
+	y = Math.floor(Math.random()*systems_height);
+	//for (x = 0; x < systems_width; x++) {
+	//	for (y = 0; y < systems_height; y++) {
+			background = Math.floor(Math.random()*4); // Background
+			filter = Math.floor(Math.random()*3); // Filter
+			shape = Math.floor(Math.random()*5); // Shape
+			order = Math.floor(Math.random()*4); // Order
+			draw_system("horizontal", x, y);
+	//	}
+	//}
+}
+
+function draw_system(orientation, pos_x, pos_y) {
+
+	switch (background) { // Background
+		case 0:
+			bgcolour = "#fff";
+			break;
+		case 1:
+			bgcolour = "#aaa";
+			break;
+		case 2:
+			bgcolour = "#555";
+			break;
+		case 3:
+			bgcolour = "#000";
+			break;
+	}
+	bgcolour = "#000";
+	
+	canvas.rect(x*system_width,y*system_height,system_width,system_height).attr({ // Background
+		fill: bgcolour,
+		stroke: bgcolour,
+		"stroke-width": 0,
+	});
+
+	element_width = system_width/10;
+	element_height = system_height/10;
+
+	if (orientation == "horizontal") {
+		system_palette = [];
+		for (i=0;i<64; i++) {
+			system_palette[i] = palette[(pos_y*64)+i];
+		}
+		switch (shape) { // Shape
+			case 0:
+				stroke_width = element_width/4;
+				stroke_height = element_height/4;
+				stroke_thickness = 0;
+				break;
+			case 1:
+				stroke_width = element_width/2;
+				stroke_height = element_height/4;
+				stroke_thickness = 0;
+				break;
+			case 2:
+				stroke_width = element_width;
+				stroke_height = element_height/4;
+				stroke_thickness = 0;
+				break;
+			case 3:
+				stroke_width = element_width/2;
+				stroke_height = element_height/2;
+				stroke_thickness = 0;
+				break;
+			case 4:
+				stroke_width = element_width;
+				stroke_height = element_height;
+				stroke_thickness = 0;
+				break;
+		}
+	}
+	else {
+		system_palette = [];
+		for (i=0;i<64; i++) {
+			system_palette[i] = palette[(i*64)+pos_x];
+		}
+		switch (shape) { // Shape
+			case 0:
+				stroke_width = element_width/4;
+				stroke_height = element_height/4;
+				stroke_thickness = 0;
+				break;
+			case 1:
+				stroke_width = element_width/4;
+				stroke_height = element_height/2;
+				stroke_thickness = 0;
+				break;
+			case 2:
+				stroke_width = element_width/4;
+				stroke_height = element_height;
+				stroke_thickness = 0;
+				break;
+			case 3:
+				stroke_width = element_width/2;
+				stroke_height = element_height/2;
+				stroke_thickness = 0;
+				break;
+			case 4:
+				stroke_width = element_width;
+				stroke_height = element_height;
+				stroke_thickness = 0;
+				break;
+		}
+	}
+
+	switch (filter) { // Filter
+		case 0:
+			min_l = 0;
+			max_l = 100;
+			min_s = 0;
+			max_s = 100;
+			break;
+		case 1:
+			min_l = 30;
+			max_l = 70;
+			min_s = 50;
+			max_s = 100;
+			break;
+		case 2:
+			min_l = 45;
+			max_l = 55;
+			min_s = 50;
+			max_s = 100;
+			break;
+	}
+
+	switch (order) { // Order
+		case 0:
+			system_palette.sort(Icompare);
+			break;
+		case 1:
+			system_palette.sort(Hcompare);
+			break;
+		case 2:
+			system_palette.sort(Scompare);
+			break;
+		case 3:
+			system_palette.sort(Lcompare);
+			break;
+	}
+
+	for (i=0;i<64; i++) {
+		pos = i;
+		box_w = stroke_width;
+		box_h = stroke_height;
+		// Position on grid according to palette position
+		box_x = x*system_width+element_width+(element_width*(i%8))+(element_width-box_w)/2;
+		box_y = y*system_height+element_height+(element_height*Math.floor(i/8))+(element_height-box_h)/2;
+
+		if (system_palette[pos].l >= min_l &&
+			system_palette[pos].l <= max_l &&
+			system_palette[pos].s >= min_s &&
+			system_palette[pos].s <= max_s) {
+
+			hslcolour = "hsl("+system_palette[pos].h+","+system_palette[pos].s+","+system_palette[pos].l+")";
+			canvas.rect(box_x,box_y,box_w,box_h).attr({
+				fill: hslcolour,
+				stroke: hslcolour,
+				"stroke-width": stroke_thickness,
+			});
+		}
+	}
+}
+
+// Loop
+const t = setInterval(loop, 1000);
+function loop() {
+	draw();
+}
+	
+$(window).resize(function() {
+	screenwidth = window.innerWidth;
+	screenheight = window.innerHeight;
+	console.log("Screen: "+screenwidth+"x"+screenheight);
+	canvas.clear();
+	draw();
+});
+
+</script>
+
+</body>
+</html>

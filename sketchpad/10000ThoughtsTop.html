@@ -1,0 +1,251 @@
+<!--
+	10th November 2019
+	10,000 Thoughts Top
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="robots" content="noindex">
+	<title>10,000 Thoughts Top</title>
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+	<script type="text/javascript" src="/js/raphael.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="style.css" />
+	<meta name='viewport' content='user-scalable=yes, initial-scale=1.0, maximum-scale=1.0, width=device-width'>
+</head>
+<body>
+	<div id="matrixviewer"></div>
+	<div id="information"></div>
+
+	<script type="text/javascript">
+
+/***********/
+/* JS Code */
+/***********/
+
+var matrixx = 8;
+var matrixy = 8;
+var matrixcanvas = new Raphael(document.getElementById('matrixviewer'),matrixx*50,matrixy*50);
+var cells = [];
+
+function connectToLights() {
+	for (y=0; y<matrixy; y++) {
+		for (x=0; x<matrixx; x++) {
+			cells.push(matrixcanvas.ellipse(x*50+25,y*50+25,20,20).attr({
+				fill: "rgb(0,0,0)",
+				stroke: "none"
+			}));
+		}
+	}
+}
+
+function setLight(i, r, g, b) {
+	cells[i].attr({
+		fill: "rgb("+r+","+g+","+b+")",
+		stroke: "none"
+	});
+
+}
+
+function updateLights() {
+}
+
+function random(val) {
+	return Math.floor(Math.random()*val);
+}
+
+function floor(val) {
+	return Math.floor(val);
+}
+
+function updatestatus() {
+	info = "<div><span>"+frameDelays[currentFrameDelay]+" "+speedFactor+" "+overallBrightness+"</span></div>";
+	for (i=0; i<numSprites; i++) {
+		info += "<div><span>"+sprites[i][1]+"</span> ";
+		info += "<span>"+sprites[i][2]+"</span> ";
+		info += "<span>"+sprites[i][3]+"</span> ";
+		info += "<span>"+sprites[i][4]+"</span> ";
+		info += "<span>"+sprites[i][7]+"</span> ";
+		info += "<span>"+sprites[i][8]+"</span></div>";
+	}
+	$('#information').html(info);
+}
+
+/**********************
+* Cross Platform Code *
+***********************/
+
+// Variables
+var numPresets = 1;
+var numSprites = 3;
+var numLights = 64;
+
+var i, j, x, y;
+var r, g, b;
+var rinc, ginc, binc;
+
+var sprites = [];
+// status, current_position, sprite_size, light_inc, starting_rinc, starting_ginc, starting_binc, active_lights
+var lights = [];
+// status, r, g, b, rinc, ginc, binc, sprite
+
+// Settings
+var currentPreset = 0;
+var presets = [
+  // starting_sprite_size, sprite_brightness_percentage
+  [4, 40]
+];
+var currentFrameDelay = 2;
+var frameDelays = [100, 100, 100, 100, 50, 50, 50, 50, 20, 20];
+var frameDelayChance = 250; // Chance of frameDelay change per frame
+var spriteChance = 250; // Chance of sprite change per frame
+
+var speedFactor = 10;
+var overallBrightnessMin = 0;
+var overallBrightnessMax = 0;
+var overallBrightness = 100;
+var overallBrightnessInc = 1;
+
+setup();
+loop();
+
+function setup() {
+  // Publish Status of System
+	version = "10,000 Thoughts Top 0.3";
+	$('#information').text(version);
+	console.log(version);
+
+  // Connect to Lights
+  connectToLights();
+
+  // Setup Sprites
+  for (i=0; i<numSprites; i++) {
+		sprites[i] = []; // JS Only
+    sprites[i][0] = true; // status
+    sprites[i][1] = random(numLights); // current_position
+    sprites[i][2] = 3;   // starting_sprite_size
+    sprites[i][3] = 1;   // light_inc
+    sprites[i][4] = 10;  // starting_rinc
+    sprites[i][5] = 10;  // starting_ginc
+    sprites[i][6] = 10;  // starting_binc
+    sprites[i][7] = 100; // brightness_percentage
+    sprites[i][8] = 0;   // active_lights
+  }
+
+  // Setup Lights
+	for (i=0; i<numLights; i++) {
+		lights[i] = []; // JS Only
+		lights[i][0] = false; // status
+		lights[i][1] = 0; // current_r
+		lights[i][2] = 0; // current_g
+		lights[i][3] = 0; // current_b
+		lights[i][4] = 1; // current_rinc
+		lights[i][5] = 1; // current_ginc
+		lights[i][6] = 1; // current_binc
+		lights[i][7] = 0; // brightness_percentage
+		lights[i][8] = 0; // current_sprite
+	}
+  updateLights();
+
+  // Activate Sprites
+  for (i=0; i<numSprites; i++) {
+    lights[sprites[i][1]][0] = true;          // status
+    lights[sprites[i][1]][4] = sprites[i][4]; // current_rinc
+    lights[sprites[i][1]][7] = sprites[i][7]; // brightness_percentage
+    lights[sprites[i][1]][8] = i;             // current_sprite
+  }
+}
+
+function loop() {
+	setTimeout(function() {
+		// Activate Lights
+		for (i=0; i<numSprites; i++) {
+			if (sprites[i][0]) { // Sprite is active
+				// Sprite Randomiser
+				if (spriteChance && random(spriteChance) == 0) {
+					sprites[i][3] *= -1;            // light_inc (direction)
+					sprites[i][4] = random(20) + 1; // rinc (speed)
+				}
+				if (lights[sprites[i][1]][1] >= 256/sprites[i][2]-1) {
+					sprites[i][1] += sprites[i][3];
+					if (sprites[i][1] > numLights - 1) {
+						sprites[i][1] = numLights - 1;
+						sprites[i][3] *= -1;
+					}
+					else if (sprites[i][1] < 0) {
+						sprites[i][1] = 0;
+						sprites[i][3] *= -1;
+					}
+					else {
+						lights[sprites[i][1]][0] = true;          // status
+						lights[sprites[i][1]][4] = sprites[i][4]; // current_rinc
+						lights[sprites[i][1]][7] = sprites[i][7]; // brightness_percentage
+						lights[sprites[i][1]][8] = i;             // current_sprite
+					}
+				}
+			}
+		}
+
+		// frameDelay Randomiser
+		if (frameDelayChance && random(frameDelayChance) == 0) {
+			currentFrameDelay = random(10);
+		}
+
+		// Process Frame
+		for (i=0; i<numLights; i++) {
+			sprites[lights[i][8]][8] = 0; // Zero the sprite light counts
+			if (lights[i][0]) { // On/Off?
+				lights[i][1] += lights[i][4];
+				if (lights[i][1] >= 255) {
+					lights[i][1] = 255;
+					lights[i][4] *= -1;
+				}
+				if (lights[i][1] <= 0) { // Deactivate sprite
+					lights[i][0] = false;
+					lights[i][1] = 0;
+					lights[i][4] = 0;
+				}
+			}
+		}
+
+		// Overall Brightness Control
+		if (overallBrightnessMax) {
+			overallBrightness += overallBrightnessInc;
+			if (overallBrightness >= overallBrightnessMax) {
+				overallBrightness = overallBrightnessMax;
+				overallBrightnessInc *= -1;
+			}
+			if (overallBrightness <= overallBrightnessMin) {
+				overallBrightness = overallBrightnessMin;
+				overallBrightnessInc *= -1;
+			}
+		}
+
+		// Render Frame
+		for (i=0; i<numLights; i++) {
+			if (lights[i][0]) { //On/Off?
+				r = floor((lights[i][1]*lights[i][7])/100);
+				if (overallBrightnessMax) {
+					r = floor((r*overallBrightness)/overallBrightnessMax); // Calculate as a double or float?
+				}
+				sprites[lights[i][8]][8]++; // Count the sprite lights
+				setLight(i, r, r, r);
+			}
+			else {
+				setLight(i, 0, 0, 0);
+			}
+		}
+
+		// Status
+		updatestatus();
+
+		updateLights();
+		loop();
+	}, frameDelays[currentFrameDelay]/speedFactor);
+}
+
+	</script>
+</body>
+</html>

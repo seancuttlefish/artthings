@@ -1,0 +1,190 @@
+body {
+    margin: 0;
+    font-family: sans-serif;
+    background-color: #fff;
+}
+
+a {
+	color: #fff;
+	text-decoration: none;
+	padding: 12px 6px;
+}
+
+#sketchpad {
+		position: fixed;
+    background-color: #fff;
+    margin-top: 52px;
+		background-color: #f6f6f6;
+}
+#browser {
+    background-color: #fff;
+    margin-top: 52px;
+}
+#viewer {
+    background-color: #fff;
+    margin-top: 52px;
+		background-color: #f6f6f6;
+}
+#standaloneviewer {
+	position: fixed;
+	display: block;
+	background-color: #f6f6f6;
+}
+#matrixviewer {
+		z-index: 999;
+		position: fixed;
+		background-color: #000;
+}
+#toolbar {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 38px;
+	z-index: 999;
+	background-color: #000;
+	padding: 6px 0;
+}
+#toolbar .left {
+	position: fixed;
+	top: 6px;
+	left: 6px;
+}
+#toolbar .right {
+	position: fixed;
+	top: 6px;
+	right: 6px;
+}
+#toolbar button {
+	width: 38px;
+	height: 38px;
+	color: #fff;
+	padding: 0;
+	margin: 0;
+	border: 1px solid #666;
+	background-color: #000;
+	background-image: none;
+	-webkit-appearance: none;
+}
+#toolbar button img {
+	width: 36px;
+	height: 36px;
+}
+
+#penmenu {
+	display: none;
+	z-index: 9999;
+	position: fixed;
+	top: 44px;
+	left: 112px;
+	color: #000;
+	background-color: #000;
+	border: 1px solid #ccc;
+	box-shadow: rgba(0, 0, 0, 0.2) 0px 15px 15px 0px;
+}
+#penmenu ul {
+	width: 194px;
+	list-style-type: none;
+	margin: 4px;
+	padding: 4px;
+}
+#penmenu ul li {
+	display: inline;
+}
+#penmenu ul li a {
+	width: 15px;
+	height: 11px;
+	padding: 0;
+	margin: 2px;
+}
+#penmenu ul .active {
+	border: 1px solid #fff;
+}
+
+#browser ul {
+	list-style-type: none;
+	margin: 4px;
+	padding: 4px;
+}
+#browser ul li {
+	display: block;
+	float: left;
+	width: 92px;
+	height: 92px;
+	border: 4px solid #fff;
+}
+#browser img {
+	width: 100%;
+	height: auto;
+}
+#browser a {
+	display: block;
+	width: 92px;
+	height: 92px;
+	overflow: hidden;
+	padding: 0;
+	background-color: #f6f6f6;
+}
+
+#filepalette,
+#penpalette,
+#playbackpalette,
+#downloadpalette,
+#analysispalette {
+	margin-right: 20px;
+}
+
+#colourbutton,
+#penbutton {
+	position: relative;
+	top: -14px;
+}
+
+#time {
+	position: fixed;
+	z-index: 999;
+	bottom: 0;
+	left: 0;
+	color: #666;
+	padding: 4px;
+	font-size: 90%;
+}
+
+#information {
+	position: fixed;
+	z-index: 999;
+	bottom: 0;
+	right: 0;
+	color: #666;
+	padding: 4px;
+	font-size: 90%;
+}
+#information a {
+	color: #ccc;
+	padding: 0;
+}
+
+@media (max-width: 550px) {
+	#downloadpalette,
+	#analysispalette {
+		display: none !important;
+	}
+}
+
+@media (max-width: 800px) {
+	#analysispalette {
+		display: none !important;
+	}
+}
+
+/* Dev */
+
+.grid {
+	background-image: url("images/16x16.png");
+}
+#matrix {
+	position: fixed;
+	top: 52px;
+	left: 324px;
+    background-color: #000;
+}

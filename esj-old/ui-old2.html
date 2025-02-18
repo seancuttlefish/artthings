@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-title" content="ESJ Lights">
+	<meta name="apple-mobile-web-app-status-bar-style" content="white-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ESJ Lights</title>
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/@jaames/iro@5"></script>
+	<script type="text/javascript" src="/js/mqttws31.min.js"></script>
+	<script type="text/javascript" src="/js/chance.min.js"></script>
+	<script type="text/javascript">
+
+		var instanceid = new Chance(Math.random).guid(); // A unique ID for this instance
+		console.log("Instance ID: "+instanceid);
+
+		componentid = "ui";
+		console.log("Component ID: "+componentid); // The specific componentid 
+
+		// MQTT Server
+		var SERVERHOST = "lumserver.local"
+		var SERVERPORT = 9001;
+		var useSSL = false;
+
+		// var SERVERHOST = "iot.artthings.io"
+		// var SERVERPORT = 8884;
+		// var useSSL = true;
+
+		console.log(SERVERHOST + ":" + SERVERPORT);
+		console.log(SERVERHOST + ":" + SERVERPORT);
+
+		var state = {
+			'id': instanceid,
+			'ecosystem': 'cybecol',
+			'system': 'esj',
+			'component': componentid,
+			'packetsin': 0,
+			'packetsout': 0,
+			'ontime': Math.floor(new Date().getTime() / 1000),
+			'uptime': 0,
+			'status': 'ok'
+		}
+
+		//////////
+		// MQTT //
+		//////////
+
+		var mqttconnected = false;
+		var reconnectTimeout = 10000;
+		MQTTConnect();
+
+		function MQTTConnect() {
+			console.log("Connecting..");
+			$('#information').text("Connecting..");
+			client = new Paho.MQTT.Client(SERVERHOST, SERVERPORT, "web_" + new Date().getTime());
+			client.onConnectionLost = onConnectionLost;
+			client.onMessageArrived = onMessageArrived;
+			client.connect({
+				useSSL: useSSL,
+				timeout: 10,
+				onSuccess: onSuccess,
+				onFailure: onFailure
+			});
+		}
+
+		function onSuccess() {
+			console.log("MQTT Connection Established " + SERVERHOST + ":" + SERVERPORT);
+			$('#information').text("Connection OK");
+			mqttconnected = true;
+				// Subscribe to core topics
+			client.subscribe(state.ecosystem + "/env/all/hello");
+			client.subscribe(state.ecosystem + "/" + state.system + "/all/hello");
+			client.subscribe(state.ecosystem + "/" + state.system + "/all/uicallback");
+			// Send state
+			sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+		}
+
+		function onFailure(response) {
+			console.log("MQTT Unable to Connect");
+			$('#information').text("Unable to Connect");
+			mqttconnected = false;
+			setTimeout(MQTTConnect(), reconnectTimeout);
+		}
+
+		function onConnectionLost(response) {
+			console.log("MQTT Connection Lost");
+			$('#information').text("Connection Lost");
+			mqttconnected = false;
+			setTimeout(MQTTConnect(), reconnectTimeout);
+		}
+
+		function onMessageArrived(message) {
+			// ecology/system/component/event
+			var topics = message.destinationName.split("/");
+			var ecology = topics[0];
+			var system = topics[1];
+			var component = topics[2];
+			var event = topics[3]; // hello, movement, image, soundon, soundoff
+
+			var packet;
+			var sourceid = "";
+			var data = "";
+			try {
+				packet = JSON.parse(message.payloadString);
+				sourceid = packet.sourceid;
+				data = packet.data;
+				if (!sourceid) {
+					sourceid = component;
+					data = message.payloadString;
+				}
+			}
+			catch (e) {
+				sourceid = component;
+				data = message.payloadString;
+			}
+			switch (event) {
+				case 'hello':
+					state.uptime = Math.floor(new Date().getTime() / 1000) - state.ontime;
+					sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+					break;
+				case 'uicallback':
+					break;
+			}
+			console.log("MQTT Message Received: " + message.destinationName);
+			state.packetsin++;
+			mqttconnected = true;
+		}
+
+		function sendmqtt(topic, packet) {
+			var message = new Paho.MQTT.Message(JSON.stringify(packet));
+			message.destinationName = topic;
+			client.send(message);
+			console.log("MQTT Message Sent "+topic);
+			state.packetsout++;
+		}
+
+		////////
+		// UI //
+		////////
+
+		var mode = "";
+		var currentpage = 0;
+		var currentsubpage = 0;
+		var pages = [
+			{"title": "Home", "type": "overview", "html": 0, "bg": "bg.jpg",
+				"subpages": []
+			},
+			{"title": "Hotel Roof", "type": "level", "html": 0, "bg": "bg2.jpg",
+				"subpages": [
+					{"title": "HR1/HR8 Handrails", "group": 209, "type": "control", "basepreset": 200, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "html": 0, "bg": "bg3.jpg" },
+					{"title": "HR Floods", "group": 209, "type": "control", "basepreset": 210, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "html": 0, "bg": "bg3.jpg" },
+					{"title": "HR6a-6d", "group": 221, "type": "control", "basepreset": 0, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'],"html": 1, "bg": "bg3.jpg" },
+					{"title": "HR9 Steps", "group": 299, "type": "control", "basepreset": 220, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "html": 1, "bg": "bg3.jpg" }
+				]
+			},
+			{"title": "Level 04", "type": "level", "html": 0, "bg": "bg2.jpg",
+				"subpages": [
+					{"title": "All Escalators", "group": 105, "type": "control", "basepreset": 0, "buttons": [], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Escalator 11/12", "group": 65, "type": "control", "basepreset": 310, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Escalator 17", "group": 77, "type": "control", "basepreset": 350, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Ribbon 11", "group": 443, "type": "control", "basepreset": 320, "buttons": ['Default','Cycle','Scroll'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Luminosity", "group": 411, "type": "control", "basepreset": 340, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "L2 Bench", "group": 0, "type": "control", "basepreset": 350, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "F9 Roof Uplights", "group": 0, "type": "control", "basepreset": 300, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" }
+				]
+			},
+			{"title": "Level 03", "type": "level", "html": 0, "bg": "bg2.jpg",
+				"subpages": [
+					{"title": "All Escalators", "group": 101, "type": "control", "basepreset": 0, "buttons": [], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Escalator 9/10", "group": 61,  "type": "control", "basepreset": 400, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Ribbon 9", "group": 439, "type": "control", "basepreset": 410, "buttons": ['Default','Cycle','Scroll'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Entrance Slots", "group": 415, "type": "control", "basepreset": 430, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Column Uplights", "group": 0, "type": "control", "basepreset": 420, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Grand Steps", "group": 9, "type": "control", "basepreset": 440, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" }
+				]
+			},
+			{"title": "Level 02", "type": "level", "html": 0, "bg": "bg2.jpg",
+				"subpages": [
+					{"title": "All Escalators", "group": 97, "type": "control", "basepreset": 0, "buttons": [],"colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Escalator 3/4", "group": 49, "type": "control", "basepreset": 500, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'],"colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Escalator 7/8", "group": 57, "type": "control", "basepreset": 520, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Escalator 15/16", "group": 73, "type": "control", "basepreset": 540, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Ribbon 3", "group": 427, "type": "control", "basepreset": 510, "buttons": ['Default','Cycle','Scroll'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Ribbon 7", "group": 435, "type": "control", "basepreset": 530, "buttons": ['Default','Cycle','Scroll'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "St J Fibre", "group": 237, "type": "control", "basepreset": 550, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" }
+				]
+			},
+			{"title": "Level 01", "type": "level", "html": 0, "bg": "bg2.jpg",
+				"subpages": [
+					{"title": "All Escalators", "group": 93, "type": "control", "basepreset": 0, "buttons": [], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Escalator 1/2", "group": 45, "type": "control", "basepreset": 600, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Escalator 5/6", "group": 53, "type": "control", "basepreset": 610, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Escalator 13/14", "group": 69, "type": "control", "basepreset": 620, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Ribbon 1", "group": 423, "type": "control", "basepreset": 630, "buttons": ['Default','Cycle','Scroll'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Ribbon 5", "group": 431, "type": "control", "basepreset": 640, "buttons": ['Default','Cycle','Scroll'], "butons": 3, "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Cathedral Sq Column", "group": 0, "type": "control", "basepreset": 0, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" }
+				]
+			},
+			{"title": "Food Court", "type": "level", "html": 0, "bg": "bg2.jpg",
+				"subpages": [
+					{"title": "Rings", "group": 253, "type": "control", "basepreset": 0, "buttons": [], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Columns" ,"group": 269, "type": "control", "basepreset": 0, "buttons": [], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Wash Lights", "group": 283, "type": "control", "basepreset": 0, "buttons": [], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Single Ovation Profile", "group": 287, "type": "control", "basepreset": 0, "buttons": [], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "4 x Ovation Profiles", "group": 291, "type": "control", "basepreset": 0, "buttons": [], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "Lighting Desk", "group": 0, "type": "control", "basepreset": 0, "buttons": [], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" }
+				]
+			},
+			{"title": "Car Parks", "type": "level", "html": 0, "bg": "bg2.jpg",
+				"subpages": [
+					{"title": "B1 Escalator 1/2", "group": 81, "type": "control", "basepreset": 0, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "B2 Escalator 3/4", "group": 85, "type": "control", "basepreset": 0, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "B3 Escalator 5/6", "group": 89, "type": "control", "basepreset": 0, "buttons": ['Default','Cycle','Scroll','Sparkle','Burst','Ripple','Waves'], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" }
+				]
+			},
+			{ "title": "Features", "type": "level", "html": 0, 	"bg": "bg2.jpg",
+				"subpages": [
+					{"title": "All Lights", "group": 0, "type": "control", "basepreset": 101, "buttons": [], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+					{"title": "All Escalators", "group": 41, "type": "control", "basepreset": 0, "buttons": [], "colourwheel": 1, "html": 1, "bg": "bg3.jpg" },
+				]
+			}
+		];
+		var html = "";
+
+		///////////////////
+		// Colour Picker //
+		///////////////////
+		
+		var colorPicker = new iro.ColorPicker('#picker', {
+			width: 300,
+			height: 300
+		});
+		colorPicker.on("color:change", function(color) {
+			var colour = color.rgbString.replace(/ |rgb|\(|\)/g,'');
+			var rgb = colour.split(",");
+			var red = (parseInt(rgb[0])+1000).toString().substr(1);
+			var green = (parseInt(rgb[1])+1000).toString().substr(1);
+			var blue = (parseInt(rgb[2])+1000).toString().substr(1);
+			var group = (parseInt(pages[currentpage].subpages[currentsubpage].group)+1000).toString().substr(1);
+			var message = "rgbgroup,"+group+","+red+","+green+","+blue;
+			console.log(message);
+			$("#information").text(message);
+			sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/trigger",message);
+		});
+
+		/////////////////
+		// Render Page //
+		/////////////////
+		
+		function renderpage(page, subpage) { // pagenumber is global
+			var buttons = "";
+			$("#buttons").html(buttons);
+			$("#buttons").hide();
+			var presets = "";
+			$("#presets").html(presets);
+			$("#presets").hide();
+			$("#picker").hide();
+			$("#colours").hide();
+			var help = "";
+			$("#help").html(help);
+
+			if (subpage == -1) { // Render Page
+				currentpage = page;
+				$("#title").html(pages[page].title);
+				$("#body").css("background-image", "url("+pages[page].bg+")");
+				$("#back-button").hide();
+				$("#menu-wrapper").show();
+				switch (pages[page].type) {
+					case 'overview':
+						break;
+					case 'level':
+						for (i=0; i<pages[page].subpages.length; i++) {
+							buttons += "<button pageid='"+page+"' subpageid='"+i+"'>"+pages[page].subpages[i].title+"</button>";
+						}
+						$("#buttons").html(buttons);
+						$("#buttons").show();
+						break;
+					case 'fittings':
+						$("#buttons").show();
+						break;
+				}
+				$("button").click(function(e) {
+					renderpage(e.srcElement.attributes.pageid.value, e.srcElement.attributes.subpageid.value);
+				});
+			}
+			else { // Render Subpage
+				$("#title").html(pages[page].subpages[subpage].title);
+				$("#body").css("background-image", "url("+pages[page].subpages[subpage].bg+")");
+				currentsubpage = subpage;
+				switch (pages[page].subpages[subpage].type) {
+					case 'control':
+						var buttons = pages[page].subpages[subpage].buttons;
+						for (i=0; i<pages[page].subpages[subpage].buttons.length; i++) {
+							presets += "<button triggerid='"+i+"'>"+(i+1)+"<span class='title'><br />"+buttons[i]+"<span></button>";
+						}
+						$("#presets").html(presets);
+						$("#presets").show();
+						$("#picker").show();
+						$("#colours").show();
+						break;
+					case 'luminosity':
+						break;
+				}
+				$("button").click(function(e) {
+					var basepreset = (parseInt(pages[currentpage].subpages[currentsubpage].basepreset)+parseInt(e.srcElement.attributes.triggerid.value)+1000).toString().substr(1);
+					var message = "enqueue_trigger,"+basepreset;
+					$("#information").text(message);
+					sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/trigger",message);
+				});
+			}
+		}
+	</script>
+	<style>
+		body {
+			font-family: sans-serif;
+			background-color: #ccc;
+			margin: 0;
+			padding: 0''
+  		/*height: 100%;
+  		overflow: scroll;
+			*/touch-action: manipulation;
+			-webkit-touch-callout: none;
+    	-webkit-user-select: none;
+			-webkit-overflow-scrolling: none;
+		}
+		#header {
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100%;
+			max-width: 1024px;
+			background-color: #fff;
+			padding: 15px 0;
+			z-index: 99;
+			border-bottom: 1px solid #000;
+		}
+		#menu-wrapper {
+			position: fixed;
+			top: 7px;
+			left: 10px;
+			width: 40px;
+			height: 40px;
+			background-image: url('menu.png');
+			background-size: 100%;
+			z-index: 999;
+		}
+		#back-button {
+			position: fixed;
+			top: 7px;
+			left: 10px;
+			width: 40px;
+			height: 40px;
+			background-image: url('back.png');
+			background-size: 100%;
+			z-index: 999;
+		}
+		#menu-background {
+			position: fixed;
+			top: 54px;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background-color: #000;
+			opacity: 0.5;
+		}
+		#menu {
+			position: fixed;
+			top: 54px;
+			left: 0;
+			width: 262px;
+			list-style-type: none;
+			background-color: #fff;
+			margin: 0;
+			padding: 0;
+			overflow: scroll;
+		}
+		#menu li {
+			font-size: 24px;
+			border-bottom: 1px solid #000;
+			margin: 0;
+			padding: 10px 30px 10px 15px;
+		}
+		#menu li:hover {
+			background-color: #ccc;
+		}
+		#title {
+			font-size: 20px;
+			font-weight: bold;
+			text-align: center;
+		}
+		#help-button {
+			position: fixed;
+			top: 7px;
+			right: 10px;
+			width: 40px;
+			height: 40px;
+			background-image: url('info.png');
+			background-size: 100%;
+		}
+		#body {
+			position: fixed;
+			top: 54px;
+			left: 0;
+			right: 0;
+			bottom: 48px;
+			background-image: url('bg.jpg');
+			background-position: top left;
+			background-repeat: no-repeat;
+			overflow: scroll;
+		}
+		#controls {
+			width: 320px;
+			padding: 0;
+			margin-left: auto;
+			margin-right: auto;
+		}
+		#buttons {
+			margin: 5px;
+			padding: 5px;
+		}
+		#buttons button {
+			display: block;
+			font-size: 22px;
+			width: 100%;
+			height: 70px;
+			background-color: #eee;
+			border: 2px solid #000;
+			border-radius: 20px;
+			margin: 0;
+			padding: 5px;
+		}
+		#presets {
+			margin: 10px;
+			padding: 0 0 0 5px;
+		}
+		#presets button {
+			font-size: 24px;
+			width: 60px;
+			height: 60px;
+			background-color: #eee;
+			padding: 0;
+			margin: 5px;
+			border: 2px solid #000;
+			border-radius: 20px;
+		}
+		button:hover {
+			background-color: #999;
+		}
+		#presets button .title {
+			font-size: 18px;
+		}
+		#picker {
+			margin: 10px;
+			padding: 0;
+		}
+		#colours {
+			
+		}
+		#colours input {
+			font-size: 24px;
+			width: 60px;
+			margin: 3px;
+			text-align: center;
+		}
+		#help {
+			position: fixed;
+			top: 54px;
+			left: 0;
+			width: 100%;
+			bottom: 0;
+			background-color: #fff;
+			padding: 0;
+			overflow: scroll;
+		}
+		#help h1 {
+			font-size: 26px;
+			margin: 10px;
+		}
+		#help h2 {
+			font-size: 22px;
+			margin: 10px;
+		}
+		#help p {
+			font-size: 20px;
+			margin: 10px;
+		}
+		#footer {
+			position: fixed;
+			left: 0;
+			bottom: 0;
+			width: 100%;
+			max-width: 1024px;
+			border-top: 1px solid #000;
+			background-color: #fff;
+			z-index: 99;
+		}
+		#information {
+			color: #000;
+			padding: 15px 10px;
+		}
+		@media (min-width: 640px) {
+			#menu-wrapper {
+				background-image: none;
+			}
+			#menu-background {
+				position: fixed;
+				top: 54px;
+				left: 0;
+				width: 262px;
+				bottom: 48px;
+				background-color: #fff;
+				opacity: 1;
+			}
+			#controls {
+				width: 500px;
+				margin: 0 0 0 262px;
+			}
+			#picker {
+				margin-left: 100px;
+			}
+			#colours {
+				margin-left: 103px;
+			}
+			#buttons button {
+				display: inline;
+				width: 230px;
+				margin: 5px;
+			}
+			#presets {
+				margin: 5px;
+				padding: 5px;
+			}
+			#presets button {
+				width: 110px;
+				height: 80px;
+			}
+			button:hover {
+				background-color: #999;
+			}
+			#help {
+				position: fixed;
+				top: 54px;
+				left: 762px;
+				width: 262px;
+				bottom: 48px;
+				background-color: #fff;
+			}
+		}
+	</style>
+	</head>
+  <body>
+		<div id="header">
+			<div id="back-button"></div>
+			<div id="menu-wrapper"></div>
+			<div id="menu-background"></div>
+			<div id="title">Edinburgh St James</div>
+			<div id="help-button"></div>
+		</div>
+		<div id="body">
+			<div id="controls">
+				<div id="buttons"></div>
+				<div id="presets"></div>
+				<div id="picker"></div>
+			</div>
+			<div id="help"></div>
+		</div>
+		<div id="footer">
+			<div id="information">Connecting..</div>
+		</div>
+		<script>
+			// Menu
+			var menu = "<ul id='menu'>";
+			for (i=0; i<pages.length; i++) {
+				menu += "<li pageid='"+i+"'>"+pages[i].title+"</li>";
+			}
+			menu += "</ul>";
+			$('#menu-wrapper').html(menu);
+
+			// Menu Click
+			$("li").click(function(e) {
+				renderpage(e.srcElement.attributes.pageid.value, -1);
+			});
+
+			// Menu Background
+			if (mode == "phone") {
+				var menuon = false;
+				$("#menu").hide();
+				$("#menu-background").hide();
+				$("#menu-wrapper").click(function() {
+					if (menuon) {
+						$("#menu").hide();
+						$("#menu-background").hide();
+						menuon = false;
+					}
+					else {
+						$("#menu").show();
+						$("#menu-background").show();
+						menuon = true;
+					}
+				});
+				// Menu Background
+				$("#menu-background").click(function() {
+					$("#menu").hide();
+					$("#menu-background").hide();
+					menuon = false;
+				});
+			}
+			else {
+				$("#menu").show();
+				$("#menu-background").show();
+				$("#menu-button").hide();
+			}
+			
+			// Help
+			if (mode == "phone") {
+				var helpon = false;
+				$("#help").hide();
+				$("#help-button").click(function() {
+					if (helpon) {
+						$("#help").hide();
+						helpon = false;
+					}
+					else {
+						$("#help").show();
+						helpon = true;
+					}
+					$("#menu").hide();
+					menuon = false;
+				});
+			}
+			else {
+				$("#help").show();
+				$("#help-button").hide();
+			}
+
+			// Back Button			
+			$("#back-button").click(function() {
+				renderpage(currentpage, -1)
+			});
+
+			// Render Overview Page
+			renderpage(currentpage, -1)
+		</script>
+  </body>
+</html>

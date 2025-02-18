@@ -1,0 +1,136 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <title>Pixel Editor</title>
+	<meta name="viewport" content="width=360, user-scalable=no">
+	<link rel="apple-touch-icon" href="apple-touch-icon.png">
+	<link rel="icon" href="favicon.ico">
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/phaser-ce/2.19.2/phaser.min.js"></script>
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+	<script type="text/javascript" src="/js/mqttws31.min.js"></script>
+	<script type="text/javascript" src="/js/chance.min.js"></script>
+	<script>
+		$(document).ready(function() {
+			$("#information").hide();
+			// Show/Hide Information
+			$(document).keypress(function(e) {
+					if (e.keyCode === 105) { // q
+						$("#information").toggle();
+					}
+			});
+		});
+
+		var instanceid = new Chance(Math.random).guid(); // A unique ID for this instance
+		console.log("Instance ID: "+instanceid);
+
+		var componentid = getParameterByName('cid');
+		if (!componentid) {
+			componentid = "editor"; // The generic componentid
+		}
+		console.log("Component ID: "+componentid); // The specific componentid
+
+		var themeMode = false;
+		if (componentid == "ogl") {
+			themeMode = true;
+		}
+		var animateMode = false;
+		if (componentid == "animate") {
+			animateMode = true;
+		}
+		// artThings
+		var SERVERHOST = "iot.artthings.io";
+		var SERVERPORT = 8884;
+		var useSSL = true;
+		console.log(SERVERHOST + ":" + SERVERPORT);
+
+		var state = {
+			'id': instanceid,
+			'ecosystem': 'cybecol',
+			'system': 'pixel',
+			'component': componentid,
+			'packetsin': 0,
+			'packetsout': 0,
+			'ontime': Math.floor(new Date().getTime() / 1000),
+			'uptime': 0,
+			'status': 'ok'
+		}
+
+		// Canvas/Screen Size
+		var screenwidth = window.innerWidth;
+		var screenheight = window.innerHeight;
+		var canvaswidth = screenwidth; // Used by game.js
+		var canvasheight = screenheight; // Used by game.js
+		console.log("Screen: "+screenwidth+"x"+screenheight);
+		console.log("Canvas: "+canvaswidth+"x"+canvasheight);
+
+		// Resize Windonw
+		/*$(window).resize(function() {
+			screenwidth = window.innerWidth;
+			screenheight = window.innerHeight;
+			console.log("Screen: "+screenwidth+"x"+screenheight);
+			console.log("Canvas: "+canvaswidth+"x"+canvasheight);
+			$("#phaser canvas").css({top: (screenheight-canvasheight)/2, left: (screenwidth-canvaswidth)/2});
+		});*/
+
+		// Functions
+		function getParameterByName(name,url) {
+			if (!url) url = window.location.href;
+			name = name.replace(/[\[\]]/g, "\\$&");
+			var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+				results = regex.exec(url);
+			if (!results) return null;
+			if (!results[2]) return '';
+			return decodeURIComponent(results[2].replace(/\+/g, " "));
+		}
+
+		function getObjectProperty(obj,prop,defaultval) {
+			if (typeof obj[prop] === 'undefined') return defaultval;
+			return obj[prop];
+		}
+	</script>
+  <script type="text/javascript" src="editor.js"></script>
+	<style>
+		body {
+			font-family: sans-serif;
+			color: #666;
+			background-color: #222;
+			margin: 0;
+			-webkit-user-select: none;
+			-webkit-touch-callout: none;
+		}
+		canvas {
+			position: fixed;
+		}
+		#information {
+			position: fixed;
+			bottom: 4px;
+			right: 4px;
+			z-index: 999;
+		}
+		#help {
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 360px;
+			display: none;
+		}
+}
+	</style>
+</head>
+
+<body>
+	<div id="phaser"></div>
+	<div id="information">Pixel Editor</div>
+
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-178479274-2"></script>
+	<script>
+		window.dataLayer = window.dataLayer || [];
+		function gtag(){dataLayer.push(arguments);}
+		gtag('js', new Date());
+		gtag('config', 'UA-178479274-2');
+	</script>
+</body>
+
+</html>

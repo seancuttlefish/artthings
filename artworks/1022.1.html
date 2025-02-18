@@ -1,0 +1,303 @@
+<!--
+	29th October 2022
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+	1022.1 - Sean Clark
+	Made for Ernest's exhibitionn in Sydney. Parts are located according to saturation (x) and lightness (y) and rotated according to hue.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="robots" content="noindex">
+	<title>1022.1 - Sean Clark</title>
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-title" content="1022.1">
+	<meta name="apple-mobile-web-app-status-bar-style" content="white-translucent">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+	<script type="text/javascript" src="js/jquery.min.js"></script>
+	<script type="text/javascript" src="js/raphael.min.js"></script>
+	<script type="text/javascript" src="js/elements.js"></script>
+	<script type="text/javascript" src="js/palette.js"></script>
+	<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+	<style type="text/css">
+		body {
+			overscroll-behavior-y: contain;
+			font-family: sans-serif;
+		}
+		body {
+			background-color: #fff;
+			-webkit-user-select: none;
+			-webkit-touch-callout: none;
+		}
+		#canvas {
+			width: 640px;
+			height: 640px;
+			background-color: #fff;
+			margin: 60px auto;
+			border: 1px solid #ccc;
+		}
+		#info {
+			position: absolute;
+			top: 0;
+			left: 0;
+			margin: 10px;
+		}
+		#swatch {
+			width: 60px;
+			height: 60px;
+		}
+	</style>
+</head>
+<body>
+	<div id="canvas"></div>
+	<div id="info">
+		<div>[ <a href="index.html">index</a> ]</div>
+		<div id="values"></div>
+		<div id="swatch"></div>
+	</div>
+	<script type="text/javascript">
+
+$(document).ready(function() {
+	setup();
+	draw();
+	loop();
+});
+
+let title="1022.1";
+let canvas_width = 640;
+let canvas_height = 640;
+let canvas_border = 160;
+let canvas = new Raphael(document.getElementById('canvas'),canvas_width,canvas_height);
+let box_x, box_y;
+let box_w = 0;
+let box_h = 0;
+let x = 0;
+let y = 0;
+let h, s, l;
+let pos = 0;
+let hslcolour, value;
+
+let background = 0; // #000, #555, #aaa, #fff
+let filter = 0; // all, wide, narrow
+let shape = 0;
+let order = 0; // I, H, S, L
+
+let width_h = 2;
+let height_h = 32;
+let stroke_h = 0;
+let width_v = 32;
+let height_v = 2;
+let stroke_v = 0;
+
+let min_l = 45;
+let max_l = 55;
+let min_s = 50;
+let max_s = 100;
+
+// Setup
+function setup() {
+	// Keyboard Handling
+	$(document).keydown(function(e) {
+		console.log("Keycode: "+e.keyCode);
+		if (e.keyCode === 66) { // background
+			background++;
+			if (background > 3) {
+				background = 0;
+			}
+			switch (background) {
+				case 0:
+					$("#canvas").css('background-color', '#fff');
+					$("#canvas").css('border-color', '#ccc');
+					break;
+				case 1:
+					$("#canvas").css('background-color', '#aaa');
+					$("#canvas").css('border-color', '#aaa');
+					break;
+				case 2:
+					$("#canvas").css('background-color', '#555');
+					$("#canvas").css('border-color', '#555');
+					break;
+				case 3:
+					$("#canvas").css('background-color', '#000');
+					$("#canvas").css('border-color', '#000');
+					break;
+			}
+			draw();
+		}
+		if (e.keyCode === 70) { // filter
+			filter++;
+			if (filter > 2) {
+				filter = 0;
+			}
+			switch (filter) {
+				case 0:
+					min_l = 0;
+					max_l = 100;
+					min_s = 0;
+					max_s = 100;
+					break;
+				case 1:
+					min_l = 30;
+					max_l = 70;
+					min_s = 50;
+					max_s = 100;
+					break;
+					break;
+				case 2:
+					min_l = 45;
+					max_l = 55;
+					min_s = 50;
+					max_s = 100;
+					break;
+			}
+			draw();
+		}
+		if (e.keyCode === 83) { // shape
+			shape++;
+			if (shape > 2) {
+				shape = 0;
+			}
+			switch (shape) {
+				case 0:
+					width_h = 2;
+					height_h = 32;
+					stroke_h = 0;
+					width_v = 32;
+					height_v = 2;
+					stroke_v = 0;
+					break;
+				case 1:
+					width_h = 8;
+					height_h = 8;
+					stroke_h = 0;
+					width_v = 8;
+					height_v = 8;
+					stroke_v = 0;
+					break;
+				case 2:
+					width_h = 32;
+					height_h = 32;
+					stroke_h = 0;
+					width_v = 32;
+					height_v = 32;
+					stroke_v = 0;
+					break;
+			}
+			draw();
+		}
+		if (e.keyCode === 73) { // info
+			$("#info").toggle();
+		}
+		if (e.keyCode === 68) { // download
+			var svgString = document.getElementById('canvas').innerHTML;
+			a = document.createElement('a');
+			a.download = 'construct.svg';
+			a.type = 'image/svg+xml';
+			blob = new Blob([svgString], {"type": "image/svg+xml"});
+			a.href = (window.URL || webkitURL).createObjectURL(blob);
+			a.click();
+		}
+		if (e.keyCode === 37) { // left
+			x--;
+			if (x<0) {
+				x = 0;
+			}
+			draw();
+		}
+		if (e.keyCode === 39) { // right
+			x++;
+			if (x>63) {
+				x = 63;
+			}
+			draw();
+		}
+		if (e.keyCode === 38) { // up
+			y--;
+			if (y<0) {
+				y = 0;
+			}
+			draw();
+		}
+		if (e.keyCode === 40) { // down
+			y++;
+			if (y>63) {
+				y = 63;
+			}
+			draw();
+		}
+	});
+}
+
+// Redraw
+function draw() {
+	canvas.clear();
+
+	console.log("Palette: x="+x+", y="+y)
+	hslcolour = "hsl("+palette[(y*64)+x].h+","+palette[(y*64)+x].s+"%,"+palette[(y*64)+x].l+"%)";
+	$("#swatch").css("background-color",hslcolour);
+	values = "<b>"+title+"/"+x+"/"+y+"/"+shape+"/"+filter+"/"+order+"</b> <span>i="+((y*64)+x)+", x="+x+", y="+y+", h="+palette[(y*64)+x].h+", s="+palette[(y*64)+x].s+", l="+palette[(y*64)+x].l+", s="+shape+", f="+filter+", o="+order+"</span>";
+	$("#values").html(values);
+
+	// Horizontal
+	for (i=0;i<64; i++) {
+		pos = (y*64)+i;
+		box_w = canvas_width/width_h;
+		box_h = canvas_height/ height_h;
+		// Positioned on a grid max_s-min_s wide and max_l-min_l wide
+		box_x = Math.floor((palette[pos].s-min_s)/(max_s-min_s)*(canvas_width-canvas_border*2)-(box_w/2)+canvas_border);
+		box_y = Math.floor((palette[pos].l-min_l)/(max_l-min_l)*(canvas_height-canvas_border*2)-(box_h/2)+canvas_border);
+
+		if (palette[pos].l >= min_l &&
+			palette[pos].l <= max_l &&
+			palette[pos].s >= min_s &&
+			palette[pos].s <= max_s) {
+
+			hslcolour = "hsl("+palette[pos].h+","+palette[pos].s+","+palette[pos].l+")";
+			canvas.rect(box_x,box_y,box_w,box_h).attr({
+				fill: hslcolour,
+				stroke: hslcolour,
+				"stroke-width": stroke_h,
+			}).rotate(palette[pos].h);
+		}
+	}
+
+	// Vertical
+	for (i=0;i<64; i++) {
+		pos = (i*64)+x;
+		box_w = canvas_width/width_v;
+		box_h = canvas_height/height_v;
+		// Positioned on a grid max_s-min_s wide and max_l-min_l wide
+		box_x = Math.floor((palette[pos].s-min_s)/(max_s-min_s)*(canvas_width-canvas_border*2)-(box_w/2)+canvas_border);
+		box_y = Math.floor((palette[pos].l-min_l)/(max_l-min_l)*(canvas_height-canvas_border*2)-(box_h/2)+canvas_border);
+
+		if (palette[pos].l >= min_l &&
+			palette[pos].l <= max_l &&
+			palette[pos].s >= min_s &&
+			palette[pos].s <= max_s) {
+
+			hslcolour = "hsl("+palette[pos].h+","+palette[pos].s+","+palette[pos].l+")";
+			canvas.rect(box_x,box_y,box_w,box_h).attr({
+				fill: hslcolour,
+				stroke: hslcolour,
+				"stroke-width": stroke_v,
+			}).rotate(palette[pos].h);
+		}
+	}
+}
+
+// Loop
+function loop() {
+}
+
+$(window).resize(function() {
+	draw();
+});
+
+</script>
+
+</body>
+</html>

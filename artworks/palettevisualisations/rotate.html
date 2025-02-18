@@ -1,0 +1,258 @@
+<!--
+	8th February 2021
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+	Rotate Reworked - Sean Clark
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="robots" content="noindex">
+	<title>Rotate Reworked - Sean Clark</title>
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-title" content="Palettes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="white-translucent">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+	<script type="text/javascript" src="/js/raphael.min.js"></script>
+	<script type="text/javascript" src="/js/elements.js"></script>
+	<script type="text/javascript" src="/js/palette.js"></script>
+	<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+	<style type="text/css">
+		body {
+			overscroll-behavior-y: contain;
+		}
+		body {
+			background-color: #fff;
+			-webkit-user-select: none;
+			-webkit-touch-callout: none;
+		}
+		#canvasholder {
+			position: fixed;
+		}
+		#canvas {
+			zoom: 1;
+		}
+	</style>
+</head>
+<body>
+	<div id="canvasholder">
+		<div id="canvas"></div>
+	</div>
+	<script type="text/javascript">
+
+$(document).ready(function() {
+	setup();
+	draw();
+	loop();
+});
+
+let canvaswidth = 400;
+let canvasheight = 400;
+let screenwidth, screenheight, zoom;
+let canvas = new Raphael(document.getElementById('canvas'), canvaswidth*2, canvasheight);
+let box_x, box_y;
+let box_w = 5;
+let box_h = 90;
+let box_stroke = 0;
+let x = 0;
+let y = 0;
+let h, s, l;
+let shape = 2; // 0 = line, 1 = box, 2 = square
+let colour = 1; // 0 = b&w, 1 = full colour, 2 = filtered colour
+let hslcolour, fillcolour, value;
+
+let lowl = 20, highl = 70;
+let lows = 50, highs = 100;
+
+// Elements
+let left = [], right = [];
+
+// Palettes
+let Hpalette = [];
+let Vpalette = [];
+
+let leftindex = 0;
+let rightindex = 0;
+
+// Setup
+function setup() {
+		// Keyboard Handling
+	$(document).keydown(function(e) {
+		console.log("Keycode: "+e.keyCode);
+		if (e.keyCode === 83) { // s = shape
+			shape++;
+			if (shape == 3) {
+				shape = 0;
+			}
+			console.log("Shape: "+shape);
+			draw();
+		}
+		if (e.keyCode === 37) { // left
+			x--;
+			if (x<0) {
+				x = 0;
+			}
+			draw();
+		}
+		if (e.keyCode === 39) { // right
+			x++;
+			if (x>63) {
+				x = 63;
+			}
+			draw();
+		}
+		if (e.keyCode === 38) { // up
+			y--;
+			if (y<0) {
+				y = 0;
+			}
+			draw();
+		}
+		if (e.keyCode === 40) { // down
+			y++;
+			if (y>63) {
+				y = 63;
+			}
+			draw();
+		}
+	});
+}
+
+// Redraw
+function draw() {
+	console.log("Palette: x="+x+", y="+y)
+
+	// Position Image on Screen
+	screenheight = window.innerHeight;
+	screenwidth = window.innerWidth;
+	zoom = screenwidth/(canvaswidth*2)*0.8;
+	console.log("screenheight: "+screenheight+", screenwidth: "+screenwidth+", zoom: "+zoom);
+	$("#canvas").css({
+		"zoom": zoom
+	});
+	$("#canvasholder").css({
+		"top": (screenheight-(canvasheight*zoom))/2,
+		"left": canvaswidth*zoom/4
+	});
+	canvas.clear();
+
+	switch (shape) {
+		case 0: // line
+			box_w = canvasheight/4;
+			box_h = canvasheight/80;
+			box_stroke = 0;
+			box_offsetx = 10;
+			box_offsety = -canvasheight/80/2;
+			break;
+		case 1: // box
+			box_w = canvasheight/4;
+			box_h = box_w;
+			box_fill = 0;
+			box_stroke = 2;
+			box_offsetx = 1;
+			box_offsety = 1;
+			break;
+		case 2: // rectangle
+			box_w = canvasheight/6;
+			box_h = canvasheight/3;
+			box_stroke = 0;
+			box_offsetx = 10;
+			box_offsety = 10;
+			break;
+	}
+
+	// Left - Vertical
+	Vpalette = [];
+	for (i=0;i<64; i++) {
+		Vpalette[i] = palette[(i*64)+x];
+	}
+	Vpalette.sort(Hcompare);
+	leftindex = 0;
+	left = [];
+	for (i=0;i<64; i++) {
+		box_x = canvaswidth/2;
+		box_y = canvasheight/2;
+		if (colour) {
+			hslcolour = "hsl("+Vpalette[i].h+","+Vpalette[i].s+","+Vpalette[i].l+")";
+		}
+		else {
+			hslcolour = "hsl(0,0,0)";
+		}
+		fillcolour = hslcolour;
+		if (shape == 1) {
+			fillcolour = "none";
+		}
+		if (((Vpalette[i].l > lowl) && (Vpalette[i].l < highl)) &&
+			((Vpalette[i].s > lows) && (Vpalette[i].s < highs))) {
+			left[leftindex] = canvas.rect(box_x,box_y,box_w,box_h);
+			left[leftindex].attr({
+				fill: fillcolour,
+				stroke: hslcolour,
+				"stroke-width": box_stroke
+			});
+			angle = Math.floor(Vpalette[i].h);
+			left[leftindex].rotate(angle, canvaswidth/2-box_offsetx, canvasheight/2-box_offsety);
+			leftindex++;
+		}
+	}
+
+	// Right - Horizontal
+	Hpalette = [];
+	for (i=0;i<64; i++) {
+		Hpalette[i] = palette[(y*64)+i];
+	}
+	Hpalette.sort(Hcompare);
+	rightindex = 0;
+	right = [];
+	for (i=0;i<64; i++) {
+		box_x = canvaswidth+canvaswidth/2;
+		box_y = canvasheight/2;
+		if (colour) {
+			hslcolour = "hsl("+Hpalette[i].h+","+Hpalette[i].s+","+Hpalette[i].l+")";
+		}
+		else {
+			hslcolour = "hsl(0,0,0)";
+		}
+		fillcolour = hslcolour;
+		if (shape == 1) {
+			fillcolour = "none";
+		}
+		if (((Hpalette[i].l > lowl) && (Hpalette[i].l < highl)) &&
+			((Hpalette[i].s > lows) && (Hpalette[i].s < highs))) {
+			right[rightindex] = canvas.rect(box_x,box_y,box_w,box_h);
+			right[rightindex].attr({
+				fill: fillcolour,
+				stroke: hslcolour,
+				"stroke-width": box_stroke
+			});
+			angle = Math.floor(Hpalette[i].h);
+			right[rightindex].rotate(angle, canvaswidth+canvaswidth/2-box_offsetx, canvasheight/2-box_offsety);
+			rightindex++;
+		}
+	}
+}
+
+// Loop
+function loop() {
+}
+
+$(window).resize(function() {
+	draw();
+});
+
+	</script>
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-178479274-2"></script>
+	<script>
+		window.dataLayer = window.dataLayer || [];
+		function gtag(){dataLayer.push(arguments);}
+		gtag('js', new Date());
+		gtag('config', 'UA-178479274-2');
+	</script>
+</body>
+</html>

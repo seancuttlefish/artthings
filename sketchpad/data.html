@@ -1,0 +1,95 @@
+<!--
+	8th October 2017
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+	Data Generator
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="robots" content="noindex">
+	<title>Data Generator</title>
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="style.css" />
+	<link rel="apple-touch-icon" href="touch-icon-iphone.png" />
+	<link rel="apple-touch-icon" sizes="152x152" href="touch-icon-ipad.png" />
+	<link rel="apple-touch-icon" sizes="180x180" href="touch-icon-iphone-retina.png" />
+	<link rel="apple-touch-icon" sizes="167x167" href="touch-icon-ipad-retina.png" />
+	<link rel="shortcut icon" href="favicon.ico">
+	<meta name='viewport' content='user-scalable=yes, initial-scale=1.0, maximum-scale=1.0, width=device-width'>
+</head>
+<body>
+	<div id="output"></div>
+	<script type="text/javascript">
+	version = "Data 0.0.1";
+	console.log(version);
+
+	function getParameterByName(name, url) {
+		if (!url) url = window.location.href;
+		name = name.replace(/[\[\]]/g, "\\$&");
+		var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+			results = regex.exec(url);
+		if (!results) return null;
+		if (!results[2]) return '';
+		return decodeURIComponent(results[2].replace(/\+/g, " "));
+	}
+
+	var strokes = "";
+	var stroke = "";
+	var strokeCount = 0;
+	var duration = 0;
+	var duration,ascend,sustain,descend,wait;
+	var startTime = 0;
+	var strokeStart,strokeEnd;
+
+	var logFile;
+	var fileid = getParameterByName('id');
+
+	if (fileid) {
+		logFile = "http://art.systems/sketchpad/sketches/"+fileid+".log";
+		console.log(logFile);
+		$.getJSON(logFile, function(data) {
+			var dataLength = data.length;
+			console.log("Data Length: "+data.length);
+			var i = 0;
+			while (i < dataLength) {
+				var item = data[i].split(" ");
+				var time = item[0];
+				if ((startTime == 0) && (time != 0)) {
+					startTime = time;
+					console.log("Start Time: "+startTime);
+				}
+				time -= startTime;
+				var type = item[1];
+				var data1 = item[2];
+				var data2 = item[3];
+
+				switch(type) {
+					case 'S': // Start Path
+						strokeStart = time;
+						if (duration > 0) {
+							ascend = Math.floor(duration/3);
+							sustain = Math.floor(duration/3);
+							descend = Math.floor(duration/3);
+							wait =  strokeStart-strokeEnd
+							stroke = ",\n\t{"+ascend+","+sustain+","+descend+","+wait+",200,200,200}";
+							strokes += stroke;
+							strokeCount++;
+						}
+						break;
+					case 'E': // End Path
+						strokeEnd = time;
+						duration = strokeEnd-strokeStart;
+						break;
+				}
+				i++;
+			}
+			strokes = "int strokeCount = "+strokeCount+";\nint strokes["+(strokeCount+1)+"][8] = {\n\t// {drawing,ascend,sustain,descend,wait,r,g,b}\n\t{0,0,0,0,0,0,0,0}"+strokes+"\n};\n";
+			$('#output').html("<pre>"+strokes+"</pre>");
+		});
+	}
+	</script>
+</body>
+</html>

@@ -1,0 +1,215 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<meta name="robots" content="noindex" />
+	<title>textThing</title>
+	<meta name="viewport" content="width=device-width,height=device-height,user-scalable=no,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0">
+	<script type="text/javascript" src="../js/jquery.min.js"></script>
+	<script type="text/javascript" src="../js/mqttws31.min.js"></script>
+	<script type="text/javascript" src="../js/artthings.js"></script>
+	<script type="text/javascript" src="../js/jquery.qrcode.min.js"></script>
+	<style type="text/css">
+		body {
+			font-family: Futura, sans-serif;
+			background-color: #333;
+		}
+		#status {
+			position: absolute;
+			left: 0;
+			bottom: 0;
+			color: #999;
+			margin: 10px;
+		}
+		h1 {
+			font-size: 240%;
+			color: #fff;
+			margin-top: 20px;
+			margin-bottom: 10px;
+		}
+		#messages {
+			margin-top: 20px;
+		}
+		p {
+			font-size: 200%;
+			line-height: 120%;
+			color: #fff;
+			margin-top: 5px;
+			margin-bottom: 5px;
+		}
+		input {
+			width: 80%;
+			font-size: 200%;
+			margin-top: 5px;
+			margin-bottom: 5px;
+		}
+		button {
+			font-size: 200%;
+			margin-top: 5px;
+			margin-bottom: 5px;
+		}
+		#qrcodeholder {
+			position: absolute;
+			right: 0;
+			bottom: 0;
+			margin: 10px;
+		}
+		#qrcode {
+			border: 10px solid #fff;
+		}
+	</style>
+</head>
+
+<body>
+	<script type="text/javascript">
+$(document).ready(function() {
+	$("#form").hide();
+	if (getParameterByName('mode') == "editor") {
+		$("#qrcodeholder").hide();
+		$("#messages").hide();
+		$("#form").show();
+	}
+});
+
+var version = "textThing 0.0.1";
+console.log(version);
+
+// MQTT Server
+var SERVERHOST = "iot.artthings.io"
+var SERVERPORT = 8884;
+var useSSL = true;
+console.log(SERVERHOST + ":" + SERVERPORT);
+
+// artThings State
+var state = {
+	'id': generateUUID(),
+	'ecosystem': 'cybecol',
+	'system': 'text',
+	'component': 'editor',
+	'packetsin': 0,
+	'packetsout': 0,
+	'counter': 0,
+	'ontime': Math.floor(new Date().getTime() / 1000),
+	'uptime': 0,
+	'status': 'ok'
+}
+console.log(state.id);
+
+var mqttconnected = false;
+var reconnectTimeout = 10000;
+MQTTConnect();
+
+function MQTTConnect() {
+	console.log("Connecting..");
+	$('#information').text("Connecting..");
+	client = new Paho.MQTT.Client(SERVERHOST, SERVERPORT, "web_" + new Date().getTime());
+	client.onConnectionLost = onConnectionLost;
+	client.onMessageArrived = onMessageArrived;
+	client.connect({
+		useSSL: useSSL,
+		timeout: 10,
+		onSuccess: onSuccess,
+		onFailure: onFailure
+	});
+}
+
+function onSuccess() {
+	console.log("MQTT client connected to " + SERVERHOST + ":" + SERVERPORT);
+	mqttconnected = true;
+	$("#status").text("Connected");
+	// Subscribe to core topics
+	client.subscribe("cybecol/text/+/+");
+	// Send state
+	sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+}
+
+function onFailure(responseObject) {
+	mqttconnected = false;
+	$("#status").text("Lost Connection");
+	console.log("MQTT Failure: " + responseObject.errorMessage);
+	setTimeout(MQTTConnect(), reconnectTimeout);
+}
+
+function onConnectionLost(responseObject) {
+	mqttconnected = false;
+	$("#status").text("Lost Connection");
+	console.log("MQTT Lost connection: " + responseObject.errorMessage);
+	setTimeout(MQTTConnect(), reconnectTimeout);
+}
+
+function onMessageArrived(message) {
+	// ecosystem/system/component/event
+	var topics = message.destinationName.split("/");
+	var ecosystem = topics[0];
+	var system = topics[1];
+	var component = topics[2];
+	var event = topics[3];
+
+	var packet;
+	var sourceid = "";
+	var data = "";
+	try {
+		packet = JSON.parse(message.payloadString);
+		sourceid = packet.sourceid;
+		data = packet.data;
+		if (!sourceid) {
+			sourceid = component;
+			data = message.payloadString;
+		}
+	}
+	catch (e) {
+		sourceid = component;
+		data = message.payloadString;
+	}
+	data = data.replaceAll('"','')
+	console.log(data);
+
+	// Process events
+	switch (event) {
+		case 'hello': // Hello
+			state.uptime = Math.floor(new Date().getTime() / 1000) - state.ontime,
+			sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+			break;
+		case 'text': // Text
+			state.counter++;
+			var messages = "<p>&bull; " + data + "</p>"+$('#messages').html();
+			$('#messages').html(messages);
+			break;
+	}
+	console.log("MQTT: received " + message.destinationName);
+	state.packetsin++;
+}
+
+function sendtext() {
+	if (document.getElementById("text").value != "") {
+		value = document.getElementById("text").value;
+		sendmqtt(state.ecosystem + "/" + state.system + "/" + "all/text", value);
+		document.getElementById("text").value = "";
+	}
+}
+
+// Generate QR Code
+var qrurl = "https://artthings.io/text/index.html?mode=editor";
+jQuery(function() {
+	$('#qrcode').qrcode({
+		text: qrurl,
+		width: 200,
+		height: 200
+	});
+});
+	</script>
+	<div class="wrapper">
+		<div id="qrcodeholder">
+			<div id="qrcode"></div>
+		</div>
+		<div id="status">&nbsp;</div>
+		<h1>What are your memories of Phoenix?</h1>
+		<div id="form">
+			<input id="text"></input>
+			<button onclick="sendtext();">Share</button>
+		</div>
+		<div id="messages"></div>
+	</div>
+</body>
+
+</html>

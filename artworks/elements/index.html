@@ -1,0 +1,445 @@
+<!--
+	23rd November 2019
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+	Elements - Sean Clark
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="robots" content="noindex">
+	<title>Elements 23112019 - Sean Clark</title>
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-title" content="Elements">
+	<meta name="apple-mobile-web-app-status-bar-style" content="white-translucent">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+	<script type="text/javascript" src="../js/jquery.min.js"></script>
+	<script type="text/javascript" src="../js/mqttws31.min.js"></script>
+	<script type="text/javascript" src="../js/artthings.js"></script>
+	<script type="text/javascript" src="../js/chance.min.js"></script>
+	<script type="text/javascript" src="../js/raphael.min.js"></script>
+	<script type="text/javascript" src="../js/seedrandom/lib/alea.min.js"></script>
+	<script type="text/javascript" src="../js/Tone.js"></script>
+	<script type="text/javascript" src="../js/elements.js"></script>
+	<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+	<link rel="icon" href="./favicon.ico">
+	<style type="text/css">
+		body {
+			overscroll-behavior-y: contain;
+		}
+		body {
+			background-color: #fff;
+			-webkit-user-select: none;
+			-webkit-touch-callout: none;
+			/*cursor: none;*/
+		}
+		#palette, #subpalette1, #subpalette2 {
+			position: fixed;
+		}
+		#audiobutton {
+			position: fixed;
+			bottom: 0;
+			right: 10px;
+		}
+		#audiobutton button {
+			width: 30px;
+			height: 30px;
+			background-image: url('../assets/audiooff.png');
+			background-color: #fff;
+			border: 0;
+			cursor: pointer;
+    	outline: none;
+		}
+		rect {
+			cursor: pointer;
+		}
+	</style>
+</head>
+<body>
+	<div id="palette"></div>
+	<div id="subpalette1"></div>
+	<div id="subpalette2"></div>
+	<div id="audiobutton"><button id="playpause"></button></div>
+	<script type="text/javascript">
+
+document.getElementById("playpause").addEventListener("click", function() {
+	if (Tone.Transport.state == 'stopped') {
+		Tone.start();
+    Tone.Transport.start();
+		$("#playpause").css("background-image","url('../assets/audioon.png')");
+  } else {
+    Tone.Transport.stop();
+		$("#playpause").css("background-image","url('../assets/audiooff.png')");
+  }
+});
+
+// MQTT Server
+var SERVERHOST = "iot.artthings.io"
+var SERVERPORT = 8884;
+var useSSL = true;
+//var SERVERHOST = "iot.local"
+//var SERVERPORT = 8883;
+//var useSSL = false;
+console.log(SERVERHOST + ":" + SERVERPORT);
+
+var instanceid = new Chance(Math.random).guid(); // A unique ID for this instance
+var componentid = "explorer";
+console.log("Instance ID: " + instanceid);
+
+// artThings State
+var state = {
+	'id': instanceid,
+	'ecosystem': 'cybecol',
+	'system': 'elements',
+	'component': componentid,
+	'packetsin': 0,
+	'packetsout': 0,
+	'ontime': Math.floor(new Date().getTime() / 1000),
+	'uptime': 0,
+	'status': 'ok'
+}
+console.log(state.id);
+
+var mqttconnected = false;
+var reconnectTimeout = 10000;
+MQTTConnect();
+
+function MQTTConnect() {
+	console.log("Connecting..");
+	client = new Paho.MQTT.Client(SERVERHOST, SERVERPORT, "web_" + new Date().getTime());
+	client.onConnectionLost = onConnectionLost;
+	client.onMessageArrived = onMessageArrived;
+	client.connect({
+		useSSL: useSSL,
+		timeout: 10,
+		onSuccess: onSuccess,
+		onFailure: onFailure
+	});
+}
+
+function onSuccess() {
+}
+
+function onFailure(responseObject) {
+	mqttconnected = false;
+	//$("#status").text("Lost Connection");
+	console.log("MQTT Failure: " + responseObject.errorMessage);
+	setTimeout(MQTTConnect(), reconnectTimeout);
+}
+
+function onConnectionLost(responseObject) {
+	mqttconnected = false;
+	//$("#status").text("Lost Connection");
+	console.log("MQTT Lost connection: " + responseObject.errorMessage);
+	setTimeout(MQTTConnect(), reconnectTimeout);
+}
+
+function onMessageArrived(message) {
+}
+
+$(document).ready(function() {
+	setup();
+	draw();
+
+	// Keyboard Handling
+	$(document).keypress(function(e) {
+		if (e.keyCode === 105) { // i
+			order = "I";
+			palette.sort(Icompare);
+			renderpalette();
+			getsubpalettes(0,0);
+			rendersubpalettes();
+		}
+		if (e.keyCode === 104) { // h
+			order = "H";
+			palette.sort(Hcompare);
+			renderpalette();
+			getsubpalettes(0,0);
+			rendersubpalettes();
+		}
+		if (e.keyCode === 115) { // s
+			order = "S";
+			palette.sort(Scompare);
+			renderpalette();
+			getsubpalettes(0,0);
+			rendersubpalettes();
+		}
+		if (e.keyCode === 108) { // l
+			order = "L";
+			palette.sort(Lcompare);
+			renderpalette();
+			getsubpalettes(0,0);
+			rendersubpalettes();
+		}
+		if (e.keyCode === 112) { // p
+ 	 		var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(palette));
+ 	  	var downloadAnchorNode = document.createElement('a');
+ 	  	downloadAnchorNode.setAttribute("href", dataStr);
+ 	  	downloadAnchorNode.setAttribute("download", "palette.json");
+ 	  	document.body.appendChild(downloadAnchorNode); // required for firefox
+ 	  	downloadAnchorNode.click();
+	    downloadAnchorNode.remove();
+		}
+	});
+});
+
+// Tone Synth
+var synth = new Tone.MonoSynth().toDestination();
+const scale = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+const totalCols = 64, totalRows = 64;
+let screenwidth, screenheight, canvaswidth = 320, canvasheight = 320;
+let canvas = new Raphael(document.getElementById('palette'),canvaswidth,canvasheight);
+let subpalette1canvas = new Raphael(document.getElementById('subpalette1'),canvaswidth/2,canvasheight/2);
+let subpalette2canvas = new Raphael(document.getElementById('subpalette2'),canvaswidth/2,canvasheight/2);
+let cells = [];
+let subpalette1cells = [];
+let subpalette2cells = [];
+let palette = [];
+let subpalette1 = [];
+let subpalette2 = [];
+let selected = 0, selectedprev = 0;
+let i, j, x, y;
+let hslcolor, h, s, l;
+let order = "I";
+let border = 10;
+let subpalettewidth, subpaletteheight;
+let mouseDown = false;
+
+// Setup
+function setup() {
+	console.log("Setup: "+totalCols+"x"+totalRows);
+	let unique = false;
+	for (y=0; y<totalRows; y++) {
+		for (x=0; x<totalCols; x++) {
+			let color = new Object();
+			color.index = (y*totalRows)+x;
+			color.x = x;
+			color.y = y;
+			unique = false;
+			while (!unique) {
+				color.h = random(36000)/100;
+				unique = true;
+				i = (y*totalRows)+x;
+				for (j=0; j<i; j++) {
+					if (palette[j].h == color.h) {
+						console.log("Duplicate H:"+color.h);
+						unique = false;
+					}
+				}
+			}
+			unique = false;
+			while (!unique) {
+				color.s = (random(100000))/1000;
+				unique = true;
+				i = (y*totalRows)+x;
+				for (j=0; j<i; j++) {
+					if (palette[j].s == color.s) {
+						console.log("Duplicate S:"+color.s);
+						unique = false;
+					}
+				}
+			}
+			unique = false;
+			while (!unique) {
+				color.l = (random(100000))/1000;
+				unique = true;
+				i = (y*totalRows)+x;
+				for (j=0; j<i; j++) {
+					if (palette[j].l == color.l) {
+						console.log("Duplicate L:"+color.l);
+						unique = false;
+					}
+				}
+			}
+			palette.push(color);
+			hslcolor = "hsl("+color.h+","+color.s+","+color.l+")";
+			cells.push(canvas.rect(x,y,1,1).attr({
+				fill: hslcolor,
+				stroke: "none"
+			}));
+			i++;
+		}
+	}
+
+	for (y=0; y<8; y++) {
+		for (x=0; x<8; x++) {
+			subpalette1cells.push(subpalette1canvas.rect(x,y,1,1).attr({
+				fill: 'hsl(0,0,0)',
+				stroke: "none"
+			}));
+			subpalette2cells.push(subpalette2canvas.rect(x,y,1,1).attr({
+				fill: 'hsl(0,0,0)',
+				stroke: "none"
+			}));
+		}
+	}
+	getsubpalettes(0,0);
+}
+
+var rng = new alea("23112019");
+function random(val) {
+	return Math.floor(rng()*val);
+}
+
+// Loop
+function loop() {
+}
+
+// Event Handler
+function eventhandler(e) {
+	var canvas = document.getElementById('palette'),
+		x = e.pageX-canvas.offsetLeft,
+		y = e.pageY-canvas.offsetTop;
+	if ((x > 0) && (x < canvaswidth) && (y > 0) && (y < canvasheight)) {
+		let col = Math.floor(x/canvaswidth*64);
+		let row = Math.floor(y/canvasheight*64);
+		selected = row*totalRows+col;
+		if (selected != selectedprev) {
+			hslcolor = "hsl("+palette[selected].h+","+palette[selected].s+"%,"+palette[selected].l+"%)";
+			//$("body").css({"background-color": hslcolor});
+			if (Tone.Transport.state !== "stopped") {
+				const now = Tone.now();
+				synth.triggerAttackRelease(hslToNote(palette[selected].h,palette[selected].s,palette[selected].l), '8n',now);
+			}
+			getsubpalettes(col,row);
+			rendersubpalettes();
+		}
+	}
+	selectedprev = selected;
+}
+
+function hslToNote(h,s,l) {
+	const note = scale[Math.floor(h/30)]+(Math.floor(s/20)+2);
+	return note;	
+}
+function noteToHsl(note) {
+	return "0,0,0";
+}
+
+function getsubpalettes(col,row) {
+	subpalette1 = [];
+	subpalette2 = [];
+	for (i=0; i<64; i++) {
+		subpalette1.push(palette[col+(i*totalCols)]);
+		subpalette2.push(palette[(row*totalRows)+i]);
+	}
+}
+
+// Reraw
+function draw() {
+	screenwidth = window.innerWidth;
+	screenheight = window.innerHeight;
+	if (screenheight > screenwidth*1.5) {
+		canvaswidth = screenwidth-border*2;
+		canvasheight = canvaswidth;
+	}
+	else {
+		canvaswidth = (screenheight/1.5)-border*2;
+		canvasheight = canvaswidth;
+	}
+	subpalettewidth = canvaswidth/2-border;
+	subpaletteheight = subpalettewidth;
+
+	console.log("Draw: "+screenwidth+"x"+screenheight+" "+Math.floor(canvaswidth)+"x"+Math.floor(canvasheight));
+	canvas.setSize(canvaswidth,canvasheight);
+	subpalette1canvas.setSize(subpalettewidth,subpaletteheight);
+	subpalette2canvas.setSize(subpalettewidth,subpaletteheight);
+
+	$("#palette").css({top:border,left:border,width:canvaswidth,height:canvasheight});
+	$("#subpalette1").css({top:canvasheight+border*2,left:border,width:subpalettewidth,height:subpaletteheight});
+	$("#subpalette2").css({top:canvasheight+border*2,left:subpalettewidth+border*3,width:subpalettewidth,height:subpaletteheight});
+	renderpalette();
+	rendersubpalettes();
+}
+
+// Render Palettes
+function renderpalette() {
+	for (y=0; y<totalRows; y++) {
+		for (x=0; x<totalCols; x++) {
+			i = y*totalRows+x;
+			hslcolor = "hsl("+palette[i].h+","+palette[i].s+","+palette[i].l+")";
+			cells[i].attr({
+				x: x*(canvaswidth/totalCols),
+				y: y*(canvasheight/totalRows),
+				width: canvaswidth/totalCols,
+				height: canvasheight/totalRows,
+				fill: hslcolor
+			});
+		}
+	}
+}
+function rendersubpalettes() {
+	var ygap=0;
+	for (y=0; y<8; y++) {
+		if (y>1) {
+			ygap=1;
+		}
+		if (y>3) {
+			ygap=2;
+		}
+		if (y>5) {
+			ygap=3;
+		}
+		var xgap = 0;
+		for (x=0; x<8; x++) {
+			if (x>1) {
+				xgap=1;
+			}
+			if (x>3) {
+				xgap=2;
+			}
+			if (x>5) {
+				xgap=3;
+			}
+			i = (y*8)+x;
+			hslcolor = "hsl("+subpalette1[i].h+","+subpalette1[i].s+","+subpalette1[i].l+")";
+			subpalette1cells[i].attr({
+				x: (x+xgap)*subpalettewidth/11,
+				y: (y+ygap)*subpaletteheight/11,
+				width: subpalettewidth/11,
+				height: subpaletteheight/11,
+				fill: hslcolor
+			});
+			hslcolor = "hsl("+subpalette2[i].h+","+subpalette2[i].s+","+subpalette2[i].l+")";
+			subpalette2cells[i].attr({
+				x: (x+xgap)*subpalettewidth/11,
+				y: (y+ygap)*subpaletteheight/11,
+				width: subpalettewidth/11,
+				height: subpaletteheight/11,
+				fill: hslcolor
+			});
+		}
+	}
+}
+
+// Events
+$('#palette').on("touchstart", function(e) {
+	eventhandler(e.originalEvent.changedTouches[0]);
+});
+$('#palette').on("touchmove", function(e) {
+	eventhandler(e.originalEvent.changedTouches[0]);
+});
+$('#palette').on("click", function(e) {
+	eventhandler(e);
+});
+$('#palette').on("mousedown", function(e) {
+	mouseDown = true;
+});
+$('#palette').on("mouseup", function(e) {
+	mouseDown = false;
+});
+$('#palette').on("mousemove", function(e) {
+	if (mouseDown) {
+		eventhandler(e);
+	}
+});
+$(window).resize(function() {
+	draw();
+});
+
+	</script>
+</body>
+</html>

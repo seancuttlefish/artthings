@@ -1,0 +1,297 @@
+<!--
+	2nd November 2022
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+	1122.2 - Sean Clark
+	All horizontal and vertical palettes.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="robots" content="noindex">
+	<title>1122.2 - Sean Clark</title>
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-title" content="1122.2">
+	<meta name="apple-mobile-web-app-status-bar-style" content="white-translucent">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+	<script type="text/javascript" src="js/jquery.min.js"></script>
+	<script type="text/javascript" src="js/raphael.min.js"></script>
+	<script type="text/javascript" src="js/elements.js"></script>
+	<script type="text/javascript" src="js/palette.js"></script>
+	<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+	<style type="text/css">
+		body {
+			overscroll-behavior-y: contain;
+			font-family: sans-serif;
+		}
+		body {
+			background-color: #fff;
+			-webkit-user-select: none;
+			-webkit-touch-callout: none;
+		}
+		#canvas {
+			width: 1120px;
+			height: 640px;
+			background-color: #fff;
+			margin: 40px auto;
+			border: 1px solid #ccc;
+		}
+		#info {
+			position: absolute;
+			top: 0;
+			left: 0;
+			margin: 10px;
+		}
+		#swatch {
+			width: 60px;
+			height: 60px;
+		}
+	</style>
+</head>
+<body>
+	<div id="canvas"></div>
+	<div id="info">
+		<div>[ <a href="index.html">index</a> ]</div>
+	</div>
+	<script type="text/javascript">
+
+$(document).ready(function() {
+	setup();
+	draw();
+	loop();
+});
+
+let title="1122.2";
+let canvas_width = 1120;
+let canvas_height = 640;
+let canvas_border = 160;
+
+let canvas = new Raphael(document.getElementById('canvas'),canvas_width,canvas_height);
+let box_x, box_y;
+let box_w = 0;
+let box_h = 0;
+let x = 0;
+let y = 0;
+let h, s, l;
+let pos = 0;
+let hslcolour, value;
+
+let offset_x = 480;
+let offset_y = 0;
+let background = 0; // #000, #555, #aaa, #fff
+let filter = 0; // all, wide, narrow
+let shape = 0;
+let order = 0; // I, H, S, L
+
+let palette_h = [];
+let width_h = 8;
+let height_h = 8;
+let stroke_h = 0;
+
+let palette_v = [];
+let width_v = 8;
+let height_v = 8;
+let stroke_v = 0;
+
+let min_l = 0;
+let max_l = 100;
+let min_s = 0;
+let max_s = 100;
+
+// Setup
+function setup() {
+	// Keyboard Handling
+	$(document).keydown(function(e) {
+		console.log("Keycode: "+e.keyCode);
+		if (e.keyCode === 66) { // background
+			background++;
+			if (background > 3) {
+				background = 0;
+			}
+			switch (background) {
+				case 0:
+					$("#canvas").css('background-color', '#fff');
+					$("#canvas").css('border-color', '#ccc');
+					break;
+				case 1:
+					$("#canvas").css('background-color', '#aaa');
+					$("#canvas").css('border-color', '#aaa');
+					break;
+				case 2:
+					$("#canvas").css('background-color', '#555');
+					$("#canvas").css('border-color', '#555');
+					break;
+				case 3:
+					$("#canvas").css('background-color', '#000');
+					$("#canvas").css('border-color', '#000');
+					break;
+			}
+			draw();
+		}
+		if (e.keyCode === 70) { // filter
+			filter++;
+			if (filter > 2) {
+				filter = 0;
+			}
+			switch (filter) {
+				case 0:
+					min_l = 0;
+					max_l = 100;
+					min_s = 0;
+					max_s = 100;
+					break;
+				case 1:
+					min_l = 30;
+					max_l = 70;
+					min_s = 50;
+					max_s = 100;
+					break;
+				case 2:
+					min_l = 45;
+					max_l = 55;
+					min_s = 50;
+					max_s = 100;
+					break;
+			}
+			draw();
+		}
+		if (e.keyCode === 79) { // order
+			order++;
+			if (order > 3) {
+				order = 0;
+			}
+			console.log("Order: "+order);
+			draw();
+		}
+		if (e.keyCode === 73) { // info
+			$("#info").toggle();
+		}
+		if (e.keyCode === 68) { // download
+			var svgString = document.getElementById('canvas').innerHTML;
+			a = document.createElement('a');
+			a.download = 'construct.svg';
+			a.type = 'image/svg+xml';
+			blob = new Blob([svgString], {"type": "image/svg+xml"});
+			a.href = (window.URL || webkitURL).createObjectURL(blob);
+			a.click();
+		}
+	});
+}
+
+// Redraw
+function draw() {
+	canvas.clear();
+
+	console.log("Palette: x="+x+", y="+y)
+	//hslcolour = "hsl("+palette[(y*64)+x].h+","+palette[(y*64)+x].s+"%,"+palette[(y*64)+x].l+"%)";
+	//$("#swatch").css("background-color",hslcolour);
+	//values = "<b>"+title+"/"+x+"/"+y+"</b> <span>i="+((y*64)+x)+", x="+x+", y="+y+", h="+palette[(y*64)+x].h+", s="+palette[(y*64)+x].s+", l="+palette[(y*64)+x].l+"</span>";
+	//$("#values").html(values);
+
+	// Horizontal
+	for (y=0; y<64; y++) {
+		// Load the palette
+		palette_h = [];
+		for (i=0;i<64; i++) {
+			palette_h[i] = palette[(y*64)+i];
+		}
+		switch (order) { // Sort the palete
+			case 0:
+				console.log("Index");
+				palette_h.sort(Icompare);
+				break;
+			case 1:
+				palette_h.sort(Hcompare);
+				break;
+			case 2:
+				palette_h.sort(Scompare);
+				break;
+			case 3:
+				palette_h.sort(Lcompare);
+				break;
+		}
+
+		for (i=0;i<64; i++) {
+			pos = i;
+			box_w = 5;
+			box_h = 5;
+			// Position on grid according to palette position
+			box_x = canvas_border+(5*(i%8))+((y%8)*45);
+			box_y = canvas_border+(5*Math.floor(i/8))+Math.floor(y/8)*45;
+
+			if (palette_h[pos].l >= min_l &&
+				palette_h[pos].l <= max_l &&
+				palette_h[pos].s >= min_s &&
+				palette_h[pos].s <= max_s) {
+
+				hslcolour = "hsl("+palette_h[pos].h+","+palette_h[pos].s+","+palette_h[pos].l+")";
+				canvas.rect(box_x,box_y,box_w,box_h).attr({
+					fill: hslcolour,
+					stroke: hslcolour,
+					"stroke-width": stroke_h,
+				});
+			}
+		}
+	}
+
+	// Vertical
+	for (x=0; x<64; x++) {
+	// Load the palette
+	palette_v = [];
+	for (i=0;i<64; i++) {
+		palette_v[i] = palette[(i*64)+x];
+	}
+	switch (order) { // Sort the palete
+		case 0:
+			palette_v.sort(Icompare);
+			break;
+		case 1:
+			palette_v.sort(Hcompare);
+			break;
+		case 2:
+			palette_v.sort(Scompare);
+			break;
+		case 3:
+			palette_v.sort(Lcompare);
+			break;
+	}
+
+		for (i=0;i<64; i++) {
+			pos = i;
+			box_w = 5;
+			box_h = 5;
+			box_x = canvas_border+offset_x+(5*(i%8))+((x%8)*45);
+			box_y = canvas_border+(5*Math.floor(i/8))+Math.floor(x/8)*45;
+
+			if (palette_v[pos].l >= min_l &&
+				palette_v[pos].l <= max_l &&
+				palette_v[pos].s >= min_s &&
+				palette_v[pos].s <= max_s) {
+
+				hslcolour = "hsl("+palette_v[pos].h+","+palette_v[pos].s+","+palette_v[pos].l+")";
+				canvas.rect(box_x,box_y,box_w,box_h).attr({
+					fill: hslcolour,
+					stroke: hslcolour,
+					"stroke-width": stroke_v,
+				});
+			}
+		}
+	}
+}
+
+// Loop
+function loop() {
+}
+
+$(window).resize(function() {
+	draw();
+});
+
+</script>
+
+</body>
+</html>

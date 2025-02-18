@@ -1,0 +1,121 @@
+body {
+	background-color: #f0f0f0;
+	font-family: sans-serif;
+	background-color: #000;
+	margin: 0;
+	-webkit-user-select: none;
+	-webkit-touch-callout: none;
+}
+
+#body {
+	position: fixed;
+}
+
+p {
+	clear: both;
+	width: 312px;
+	text-align: center;
+	color: #fff;
+	background-color: #000;
+	margin: 4px;
+}
+
+a {
+	color: #fff;
+}
+
+h1 {
+	width: 312px;
+	text-align: center;
+	color: #fff;
+	font-size: 24px;
+	margin: 4px;
+}
+
+.buttonbar {
+	width: 312px;
+	z-index: 999;
+	background-color: #000;
+	padding: 0;
+	margin: 4px;
+}
+
+.buttonbar button {
+	display: block;
+	float: left;
+	width: 99px;
+	height: 65px;
+	color: #fff;
+	background-color: #333;
+	padding: 0;
+	margin: 1px;
+	border: 2px solid #fff;
+}
+
+.spritebar {
+	width: 312px;
+	z-index: 999;
+	background-color: #000;
+	padding: 0;
+	margin: 4px;
+}
+
+.spritebar button {
+	display: block;
+	float: left;
+	width: 99px;
+	height: 33px;
+	color: #fff;
+	background-color: #333;
+	padding: 0;
+	margin: 1px;
+	border: 2px solid #fff;
+}
+
+.spritebar img {
+	display: block;
+	float: left;
+	width: 95px;
+	height: 65px;
+	padding: 0;
+	margin: 1px;
+	border: 2px solid #fff;
+}
+
+.statusbar {
+	width: 320px;
+	z-index: 999;
+	background-color: #000;
+	padding: 0;
+	margin: 10px;
+}
+
+.statusbar div {
+	display: block;
+	float: left;
+	width: 28px;
+	height: 28px;
+	color: #fff;
+	background-color: #666;
+	padding: 0;
+	margin: 1px;
+}
+
+.links {
+	font-size: 18px;
+	line-height: 150%;
+}
+
+#status {
+	color: #999;
+	font-style: italic;
+	line-height: 150%;
+}
+
+.bluecheck {
+	background-image: url('bluecheck.png');
+}
+
+.yellowcheck {
+	background-image: url('yellowcheck.png');
+}

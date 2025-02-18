@@ -1,0 +1,242 @@
+<!--
+  25th May 2021
+  Sean Clark - Interact Digital Arts
+  interactdigitalarts.uk
+  Distant Drums (Dashboard)
+-->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="robots" content="noindex">
+  <title>Distant Drums</title>
+  <script type="text/javascript" src="./js/jquery.min.js"></script>
+  <script type="text/javascript" src="./js/mqttws31.min.js"></script>
+  <script type="text/javascript" src="./js/artthings.js"></script>
+  <script type="text/javascript" src="./js/chance.min.js"></script>
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+	<link rel="apple-touch-icon" href="apple-touch-icon.png">
+	<style>
+	body {
+		font-family: Helvetica, sans-serif;
+		background-color: #fff;
+		margin: 0;
+	}
+	a {
+		color: #000;
+	}
+	#status, #video, #display {
+		position: fixed;
+		top: 60px;
+		width: 40px;
+		height: 40px;
+		background-color: red;
+		border-radius: 20px;
+	}
+	#status {
+		right: 110px;
+	}
+	#video {
+		right: 60px;
+	}
+	#display {
+		right: 10px;
+	}
+	.header {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		background-color: #000;
+	}
+	.header h1 {
+		text-align: center;
+		color: #fff;
+		margin: 0;
+		padding: 5px;
+		border-bottom: 4px solid #ccc;
+	}
+	#messages {
+		font-family: monospace;
+		margin-top: 10px;
+	}
+	#distantdrums {
+		position: fixed;
+		top: 60px;
+		left: 0;
+		font-family: monospace;
+		margin: 0 10px;
+	}
+	#distantdrums button {
+		font-size: 18px;
+		height: 40px;
+		border-radius: 10px;
+	}
+	#distantdrums input {
+		width: 160px;
+		font-size: 18px;
+		border-radius: 10px;
+	}
+</style>
+  <script type="text/javascript">
+
+    var version = "Dashboard 0.2.0";
+    console.log(version);
+
+		// MQTT Server
+    var SERVERHOST = "iot.artthings.io"; // "192.168.1.100"
+    var SERVERPORT = 8884; // 8883
+    var useSSL = true; // false
+    console.log(SERVERHOST + ":" + SERVERPORT);
+
+    var instanceid = new Chance(Math.random).guid(); // A unique ID for this instance
+    var componentid = "controller";
+    console.log("Instance ID: " + instanceid);
+
+    // artThings State
+    var state = {
+      'id': instanceid,
+      'ecosystem': 'cybecol',
+      'system': 'distantdrums',
+      'component': componentid,
+      'packetsin': 0,
+      'packetsout': 0,
+      'ontime': Math.floor(new Date().getTime() / 1000),
+      'uptime': 0,
+      'status': 'ok'
+    }
+    console.log(state.id);
+
+    var mqttconnected = false;
+    var reconnectTimeout = 10000;
+    MQTTConnect();
+
+    function MQTTConnect() {
+      console.log("Connecting..");
+      client = new Paho.MQTT.Client(SERVERHOST, SERVERPORT, "web_" + new Date().getTime());
+      client.onConnectionLost = onConnectionLost;
+      client.onMessageArrived = onMessageArrived;
+      client.connect({
+        useSSL: useSSL,
+        timeout: 10,
+        onSuccess: onSuccess,
+        onFailure: onFailure
+      });
+    }
+
+    function onSuccess() {
+      console.log("MQTT client connected to " + SERVERHOST + ":" + SERVERPORT);
+      mqttconnected = true;
+      //$("#status").text("Connected");
+			$("#status").css("background-color", "green");
+      // Subscribe to core topics
+      client.subscribe(state.ecosystem + "/" + state.system + "/+/+");
+      // Send state
+      sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+    }
+
+    function onFailure(responseObject) {
+      mqttconnected = false;
+      //$("#status").text("Lost Connection");
+			$("#status").css("background-color", "red");
+      console.log("MQTT Failure: " + responseObject.errorMessage);
+      setTimeout(MQTTConnect(), reconnectTimeout);
+    }
+
+    function onConnectionLost(responseObject) {
+      mqttconnected = false;
+      //$("#status").text("Lost Connection");
+			$("#status").css("background-color", "red");
+      console.log("MQTT Lost connection: " + responseObject.errorMessage);
+      setTimeout(MQTTConnect(), reconnectTimeout);
+    }
+
+    function onMessageArrived(message) {
+      // ecosystem/system/component/event
+      var topics = message.destinationName.split("/");
+      var ecosystem = topics[0];
+      var system = topics[1];
+      var component = topics[2];
+      var event = topics[3];
+
+      try {
+        var data = JSON.parse(message.payloadString);
+      } catch (e) {
+        var data = message.payloadString;
+      }
+
+      // Process events
+      switch (event) {
+        case 'hello': // Hello
+          state.uptime = Math.floor(new Date().getTime() / 1000) - state.ontime,
+            sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+          break;
+        case 'ping': // Ping
+          break;
+        case 'state': // State
+					switch(component) {
+						case 'bass': // video
+							$("#video").css("background-color", "green");
+							$("#mode").text("Mode: "+data.mode+" ["+data.loop+"]");
+							break;
+						case 'scroller': // display
+							$("#display").css("background-color", "green");
+							break;
+					}
+          break;
+      }
+      state.packetsin++;
+    }
+    function sendmessage(topic, value) {
+      sendmqtt(state.ecosystem + "/" + state.system + "/" + topic, value);
+    }
+    function sendhello() {
+      sendmqtt(state.ecosystem + "/" + state.system + "/all/hello", "");
+			$("#video").css("background-color", "red");
+			$("#display").css("background-color", "red");
+    }
+    function sendtext() {
+			var value = $("#text").val();
+      sendmqtt(state.ecosystem + "/" + state.system + "/scroller/text", value);
+      $("#text").val("");
+    }
+    function cleartext() {
+      sendmqtt(state.ecosystem + "/" + state.system + "/scroller/text", "");
+      $("#text").val("");
+    }
+
+  </script>
+</head>
+<body class="dashboard">
+  <div class="header">
+    <h1>Distant Drums</h1>
+  </div>
+  <div class="body">
+    <div id="status">&nbsp;</div><div id="video">&nbsp;</div><div id="display">&nbsp;</div>
+    <div id="distantdrums">
+      <button onclick="sendhello();">Hello</button><br />
+			<h2 id="mode">Mode</h2>
+      <button onclick="sendmessage('controller/installation','');">Installation</button><br /><br />
+      <button onclick="sendmessage('controller/showinstallation','');">Show Installation</button>
+      <button onclick="sendmessage('controller/show','');">Show</button>
+			<h2>Video</h2>
+      <button onclick="sendmessage('controller/play','');">Play</button>
+      <button onclick="sendmessage('controller/stop','');">Stop</button>
+      <button onclick="sendmessage('controller/reload','');">Reload</button><br />
+			<h2>Audio</h2>
+      <button onclick="sendmessage('controller/voldown','');">Vol -</button>
+      <button onclick="sendmessage('controller/volup','');">Vol +</button><br />
+			<h2>Matrix</h2>
+      <button onclick="sendmessage('controller/brightnessdown','');">Brightness -</button>
+      <button onclick="sendmessage('controller/brightnessup','');">Brightness +</button><br /><br />
+			<input id="text"/>
+      <button onclick="sendtext();">Send</button>
+      <button onclick="cleartext();">Clear</button><br />
+    </div>
+    <div id="mmessages"></div>
+  </div>
+  <div class="footer"></div>
+</body>
+
+</html>

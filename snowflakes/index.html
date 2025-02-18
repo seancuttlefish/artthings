@@ -1,0 +1,200 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<title>Snowflake Wall</title>
+	<link rel="apple-touch-icon" sizes="114x114" href="./apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+	<meta name="msapplication-TileColor" content="#da532c">
+	<meta name="theme-color" content="#ffffff">
+	<meta name="apple-mobile-web-app-title" content="Snowflake Wall">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/phaser/2.6.2/phaser.min.js"></script>
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+	<script type="text/javascript" src="/js/jquery.qrcode.min.js"></script>
+	<script type="text/javascript" src="/js/mqttws31.min.js"></script>
+	<script type="text/javascript" src="/js/chance.min.js"></script>
+	<script type="text/javascript">
+		$(document).ready(function() {
+			if (getParameterByName('ui') == "clean") {
+				$("#qrcodeholder").hide();
+				$("#information").hide();
+				$("#titleholder").hide();
+			}
+			if (getParameterByName('ui') == "noqr") {
+				$("#qrcodeholder").hide();
+				$("#information").hide();
+			}
+			// Show/Hide QR Code
+			$(document).keypress(function(e) {
+					if (e.keyCode === 113) { // q
+						$("#qrcodeholder").toggle();
+					}
+			});
+			// Show/Hide Information
+			$(document).keypress(function(e) {
+					if (e.keyCode === 105) { // q
+						$("#information").toggle();
+					}
+			});
+		});
+
+		// artThings
+		var instanceid = new Chance(Math.random).guid(); // A unique ID for this instance
+		console.log("Instance ID: "+instanceid);
+
+		var componentid = getParameterByName('cid');
+		if (!componentid) {
+			componentid = "wall"; // The generic componentid
+		}
+		console.log("Component ID: "+componentid); // The specific componentid
+
+		// artThings
+		var SERVERHOST = "iot.artthings.io";
+		var SERVERPORT = 8884;
+		var useSSL = true;
+		console.log(SERVERHOST + ":" + SERVERPORT);
+
+		var state = {
+			'id': instanceid,
+			'ecosystem': 'cybecol',
+			'system': 'snowflakes',
+			'component': componentid,
+			'packetsin': 0,
+			'packetsout': 0,
+			'ontime': Math.floor(new Date().getTime() / 1000),
+			'uptime': 0,
+			'status': 'ok'
+		}
+
+		// Canvas Size
+		var screenwidth = window.innerWidth;
+		var screenheight = window.innerHeight;
+		var canvaswidth = screenwidth; // Used by game.js
+		var canvasheight = screenheight; // Used by game.js
+		console.log("Screen: "+screenwidth+"x"+screenheight);
+		console.log("Canvas: "+canvaswidth+"x"+canvasheight);
+
+		// Gamepad QR Code
+		var gamepadurl = "https://artthings.io/snowflakes/creator.html?qr";
+		jQuery(function() {
+			$('#qrcode').qrcode({
+				text: gamepadurl,
+				width: 160,
+				height: 160
+			});
+		});
+
+		// Resize Window
+		$(window).resize(function() {
+			screenwidth = window.innerWidth;
+			screenheight = window.innerHeight;
+			console.log("Screen: "+screenwidth+"x"+screenheight);
+			console.log("Canvas: "+canvaswidth+"x"+canvasheight);
+			$("#phaser canvas").css({top: (screenheight-canvasheight)/2, left: (screenwidth-canvaswidth)/2});
+		});
+
+		// Functions
+		function getParameterByName(name,url) {
+			if (!url) url = window.location.href;
+			name = name.replace(/[\[\]]/g, "\\$&");
+			var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+				results = regex.exec(url);
+			if (!results) return null;
+			if (!results[2]) return '';
+			return decodeURIComponent(results[2].replace(/\+/g, " "));
+		}
+
+		function getObjectProperty(obj,prop,defaultval) {
+			if (typeof obj[prop] === 'undefined') return defaultval;
+			return obj[prop];
+		}
+	</script>
+  	<script type="text/javascript" src="index.js"></script>
+	<style>
+		@font-face {
+			font-family: 'Garamond Regular';
+			src: url('/fonts/Adobe Garamond Regular.otf');
+		}
+		body {
+			font-family: Helvetica, sans-serif;
+			background-color: #000;
+			margin: 0;
+			cursor: none;
+			-webkit-user-select: none;
+			-webkit-touch-callout: none;
+		}
+		canvas {
+			position: fixed;
+		}
+		#titleholder {
+			position: fixed;
+			color: #fff;
+			font-size: 36px;
+			text-align: center;
+			right: 0;
+			left: 0;
+			top: 10px;
+			opacity: 0.9;
+			z-index: 999;
+			margin: 8px;
+		}
+		#qrcodeholder {
+			position: fixed;
+			left: 0;
+			bottom: 0;
+			padding: 20px;
+			width: 160px;
+			height: 160px;
+			background-color: #fff;
+			opacity: 0.9;
+			z-index: 999;
+		}
+		#information {
+			position: fixed;
+			display: none;
+			bottom: 4px;
+			right: 4px;
+			color: #fff;
+			opacity: 0.7;
+			z-index: 999;
+		}
+		a img {
+			position: fixed;
+			right: 10px;
+			bottom: 10px;
+			padding: 10px;
+			opacity: 0.1;
+			cursor: default;
+			z-index: 999;
+			width: 50px;
+			height: 50px;
+		}
+		a:hover img {
+			opacity: 1;
+		}
+	</style>
+</head>
+
+<body>
+	<div id="titleholder">SCAN THE QR CODE TO DRAW A SNOWFLAKE</div>
+	<div id="qrcodeholder">
+		<div id="qrcode"></div>
+	</div>
+	<div id="phaser"></div>
+	<div id="information"></div>
+	<a href="https://www.interactdigitalarts.uk/projects/xmas-interactives"><img src="info.png" /></a>
+
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-178479274-2"></script>
+	<script>
+		window.dataLayer = window.dataLayer || [];
+		function gtag(){dataLayer.push(arguments);}
+		gtag('js', new Date());
+		gtag('config', 'UA-178479274-2');
+	</script>
+</body>
+
+</html>

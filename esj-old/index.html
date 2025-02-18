@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>Luminosity Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="icon" href="favicon.ico">
+    <script type="text/javascript" src="./js/jquery.min.js"></script>
+    <script type="text/javascript" src="./js/raphael.min.js"></script>
+    <script type="text/javascript" src="./js/mqttws31.min.js"></script>
+    <script type="text/javascript" src="./js/chance.min.js"></script>
+    <script type="text/javascript">
+
+var instanceid = new Chance(Math.random).guid(); // A unique ID for this instance
+console.log("Instance ID: "+instanceid);
+
+componentid = "monitor";
+console.log("Component ID: "+componentid); // The specific componentid 
+
+// MQTT Server
+// var SERVERHOST = "lumserver.local"
+// var SERVERPORT = 9001;
+// var useSSL = false;
+var SERVERHOST = "iot.artthings.io";
+var SERVERPORT = 8884;
+var useSSL = true;
+console.log(SERVERHOST + ":" + SERVERPORT);
+
+// artThings
+var state = {
+    'id': instanceid,
+    'ecosystem': 'cybecol',
+    'system': 'esj',
+    'component': componentid,
+    'packetsin': 0,
+    'packetsout': 0,
+    'ontime': Math.floor(new Date().getTime() / 1000),
+    'uptime': 0,
+    'status': 'ok'
+}
+
+//////////
+// MQTT //
+//////////
+
+var mqttconnected = false;
+var reconnectTimeout = 10000;
+MQTTConnect();
+
+function MQTTConnect() {
+    console.log("Connecting..");
+    $('#information').text("Connecting..");
+    client = new Paho.MQTT.Client(SERVERHOST, SERVERPORT, "web_" + new Date().getTime());
+    client.onConnectionLost = onConnectionLost;
+    client.onMessageArrived = onMessageArrived;
+    client.connect({
+        useSSL: useSSL,
+        timeout: 10,
+        onSuccess: onSuccess,
+        onFailure: onFailure
+    });
+}
+
+function onSuccess() {
+    console.log("MQTT Connection Established " + SERVERHOST + ":" + SERVERPORT);
+    $('#information').text("Connection Established");
+    mqttconnected = true;
+        // Subscribe to core topics
+    client.subscribe(state.ecosystem + "/env/all/hello");
+    client.subscribe(state.ecosystem + "/" + state.system + "/+/movement");
+    client.subscribe(state.ecosystem + "/" + state.system + "/+/image");
+    client.subscribe(state.ecosystem + "/" + state.system + "/+/soundlevel");
+    // Send state
+    sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+}
+
+function onFailure(response) {
+    console.log("MQTT Unable to Connect");
+    $('#information').text("Unable to Connect");
+    mqttconnected = false;
+    setTimeout(MQTTConnect(), reconnectTimeout);
+}
+
+function onConnectionLost(response) {
+    console.log("MQTT Connection Lost");
+    $('#information').text("Connection Lost");
+    mqttconnected = false;
+    setTimeout(MQTTConnect(), reconnectTimeout);
+}
+
+var mtl01, mtl02, mtl03, mtl04, mtl05;
+var stl01, stl02, stl03, stl04, stl05;
+var levell01 = 0, levell02 = 0, levell03 = 0, levell04 = 0, levell05 = 0;
+var maxlevell01 = 0, maxlevell02 = 0, maxlevell03 = 0, maxlevell04 = 0, maxlevell05 = 0;
+
+var mtr01, mtr02, mtr03, mtr04, mtr05;
+var str01, str02, str03, str04, str05;
+var levelr01 = 0, levelr02 = 0, levelr03 = 0, levelr04 = 0, levelr05 = 0;
+var maxlevelr01 = 0, maxlevelr02 = 0, maxlevelr03 = 0, maxlevelr04 = 0, maxlevelr05 = 0;
+
+function onMessageArrived(message) {
+    // ecology/system/component/event
+    var topics = message.destinationName.split("/");
+    var ecology = topics[0];
+    var system = topics[1];
+    var component = topics[2];
+    var event = topics[3]; // hello, movement, image, soundon, soundoff
+
+    var packet;
+    var sourceid = "";
+    var data = "";
+    try {
+        packet = JSON.parse(message.payloadString);
+        sourceid = packet.sourceid;
+        data = packet.data;
+        if (!sourceid) {
+            sourceid = component;
+            data = message.payloadString;
+        }
+    }
+    catch (e) {
+        sourceid = component;
+        data = message.payloadString;
+    }
+
+    switch (event) {
+        case 'hello':
+            state.uptime = Math.floor(new Date().getTime() / 1000) - state.ontime;
+            sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+            break;
+        case 'movement':
+            switch (component) {
+                case 'l01':
+                    var rectangles = data.split(":");
+                    var rectanglecount = rectangles[0];
+                    l01canvas.clear();
+                    clearTimeout(mtl01);
+                    for (i=1;i<rectangles.length;i++) {
+                        var rectangle = rectangles[i].split(",");
+                        // console.log(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        var rect = l01canvas.rect(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        rect.attr({
+                            stroke: '#0f0',
+                            'stroke-width': 3
+                        });
+                    }
+                    mtl01 = setTimeout(function() { l01canvas.clear(); }, 2000);
+                    break;
+                case 'l02':
+                    var rectangles = data.split(":");
+                    var rectanglecount = rectangles[0];
+                    l02canvas.clear();
+                    clearTimeout(mtl02);
+                    for (i=1;i<rectangles.length;i++) {
+                        var rectangle = rectangles[i].split(",");
+                        // console.log(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        var rect = l02canvas.rect(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        rect.attr({
+                            stroke: '#0f0',
+                            'stroke-width': 3
+                        });
+                    }
+                    mtl02 = setTimeout(function() { l02canvas.clear(); }, 2000);
+                    break;
+                case 'l03':
+                    var rectangles = data.split(":");
+                    var rectanglecount = rectangles[0];
+                    l03canvas.clear();
+                    clearTimeout(mtl03);
+                    for (i=1;i<rectangles.length;i++) {
+                        var rectangle = rectangles[i].split(",");
+                        // console.log(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        var rect = l03canvas.rect(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        rect.attr({
+                            stroke: '#0f0',
+                            'stroke-width': 3
+                        });
+                    }
+                    mtl03 = setTimeout(function() { l03canvas.clear(); }, 2000);
+                    break;
+                case 'l04':
+                    var rectangles = data.split(":");
+                    var rectanglecount = rectangles[0];
+                    l04canvas.clear();
+                    clearTimeout(mtl04);
+                    for (i=1;i<rectangles.length;i++) {
+                        var rectangle = rectangles[i].split(",");
+                        // console.log(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        var rect = l04canvas.rect(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        rect.attr({
+                            stroke: '#0f0',
+                            'stroke-width': 3
+                        });
+                    }
+                    mtl04 = setTimeout(function() { l04canvas.clear(); }, 2000);
+                    break;
+                case 'l05':
+                    var rectangles = data.split(":");
+                    var rectanglecount = rectangles[0];
+                    l05canvas.clear();
+                    clearTimeout(mtl05);
+                    for (i=1;i<rectangles.length;i++) {
+                        var rectangle = rectangles[i].split(",");
+                        // console.log(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        var rect = l05canvas.rect(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        rect.attr({
+                            stroke: '#0f0',
+                            'stroke-width': 3
+                        });
+                    }
+                    mtl05 = setTimeout(function() { l05canvas.clear(); }, 2000);
+                    break;
+                case 'r01':
+                    var rectangles = data.split(":");
+                    var rectanglecount = rectangles[0];
+                    r01canvas.clear();
+                    clearTimeout(mtr01);
+                    for (i=1;i<rectangles.length;i++) {
+                        var rectangle = rectangles[i].split(",");
+                        // console.log(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        var rect = r01canvas.rect(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        rect.attr({
+                            stroke: '#0f0',
+                            'stroke-width': 3
+                        });
+                    }
+                    mtr01 = setTimeout(function() { r01canvas.clear(); }, 2000);
+                    break;
+                case 'r02':
+                    var rectangles = data.split(":");
+                    var rectanglecount = rectangles[0];
+                    r02canvas.clear();
+                    clearTimeout(mtr02);
+                    for (i=1;i<rectangles.length;i++) {
+                        var rectangle = rectangles[i].split(",");
+                        // console.log(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        var rect = r02canvas.rect(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        rect.attr({
+                            stroke: '#0f0',
+                            'stroke-width': 3
+                        });
+                    }
+                    mtr02 = setTimeout(function() { r02canvas.clear(); }, 2000);
+                    break;
+                case 'r03':
+                    var rectangles = data.split(":");
+                    var rectanglecount = rectangles[0];
+                    r03canvas.clear();
+                    clearTimeout(mtr03);
+                    for (i=1;i<rectangles.length;i++) {
+                        var rectangle = rectangles[i].split(",");
+                        // console.log(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        var rect = r03canvas.rect(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        rect.attr({
+                            stroke: '#0f0',
+                            'stroke-width': 3
+                        });
+                    }
+                    mtr03 = setTimeout(function() { r03canvas.clear(); }, 2000);
+                    break;
+                case 'r04':
+                    var rectangles = data.split(":");
+                    var rectanglecount = rectangles[0];
+                    r04canvas.clear();
+                    clearTimeout(mtr04);
+                    for (i=1;i<rectangles.length;i++) {
+                        var rectangle = rectangles[i].split(",");
+                        // console.log(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        var rect = r04canvas.rect(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        rect.attr({
+                            stroke: '#0f0',
+                            'stroke-width': 3
+                        });
+                    }
+                    mtr04 = setTimeout(function() { r04canvas.clear(); }, 2000);
+                    break;
+                case 'r05':
+                    var rectangles = data.split(":");
+                    var rectanglecount = rectangles[0];
+                    r05canvas.clear();
+                    clearTimeout(mtr05);
+                    console.log(data);
+                    for (i=1;i<rectangles.length;i++) {
+                        var rectangle = rectangles[i].split(",");
+                        console.log(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        var rect = r05canvas.rect(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+                        rect.attr({
+                            stroke: '#0f0',
+                            'stroke-width': 3
+                        });
+                    }
+                    mtr05 = setTimeout(function() { r05canvas.clear(); }, 2000);
+                    break;
+            }
+            break;
+        case 'image':
+            switch (component) {
+                case 'l01':
+                    $('#ml01').css("background-image", 'url('+data.replace(/'/g, '')+')');
+                    break;
+                case 'l02':
+                    $('#ml02').css("background-image", 'url('+data.replace(/'/g, '')+')');
+                    break;
+                case 'l03':
+                    $('#ml03').css("background-image", 'url('+data.replace(/'/g, '')+')');
+                    break;
+                case 'l04':
+                    $('#ml04').css("background-image", 'url('+data.replace(/'/g, '')+')');
+                    break;
+                case 'l05':
+                    $('#ml05').css("background-image", 'url('+data.replace(/'/g, '')+')');
+                    break;
+                case 'r01':
+                    $('#mr01').css("background-image", 'url('+data.replace(/'/g, '')+')');
+                    break;
+                case 'r02':
+                    $('#mr02').css("background-image", 'url('+data.replace(/'/g, '')+')');
+                    break;
+                case 'r03':
+                    $('#mr03').css("background-image", 'url('+data.replace(/'/g, '')+')');
+                    break;
+                case 'r04':
+                    $('#mr04').css("background-image", 'url('+data.replace(/'/g, '')+')');
+                    break;
+                case 'r05':
+                    $('#mr05').css("background-image", 'url('+data.replace(/'/g, '')+')');
+                    break;
+            }
+            break;
+        case 'soundlevel':
+            switch (component) {
+                case 'l01':
+                    levell01 = parseInt(data);
+                    if (levell01 > maxlevell01) {
+                        maxlevell01 = levell01;
+                    }
+                    var width = (levell01/maxlevell01)*160;
+                    clearTimeout(stl01);
+                    $('#sl01').css("width", width);
+                    stl01 = setTimeout(function() { $('#sl01').css("width", 0); }, 2000);
+                    maxlevell01--;
+                    if (maxlevell01 < 30) {
+                        maxlevell01 = 30;
+                    }
+                    break;
+                case 'l02':
+                    levell02 = parseInt(data);
+                    if (levell02 > maxlevell02) {
+                        maxlevell02 = levell02;
+                    }
+                    var width = (levell02/maxlevell02)*160;
+                    clearTimeout(stl02);
+                    $('#sl02').css("width", width);
+                    stl02 = setTimeout(function() { $('#sl02').css("width", 0); }, 2000);
+                    maxlevell02--;
+                    if (maxlevell02 < 30) {
+                        maxlevell02 = 30;
+                    }
+                    break;
+                case 'l03':
+                    levell03 = parseInt(data);
+                    if (levell03 > maxlevell03) {
+                        maxlevell03 = levell03;
+                    }
+                    var width = (levell03/maxlevell03)*160;
+                    clearTimeout(stl03);
+                    $('#sl03').css("width", width);
+                    stl03 = setTimeout(function() { $('#sl03').css("width", 0); }, 2000);
+                    maxlevell03--;
+                    if (maxlevell03 < 30) {
+                        maxlevell03 = 30;
+                    }
+                    break;
+                case 'l04':
+                    levell04 = parseInt(data);
+                    if (levell04 > maxlevell04) {
+                        maxlevell04 = levell04;
+                    }
+                    var width = (levell04/maxlevell04)*160;
+                    clearTimeout(stl04);
+                    $('#sl04').css("width", width);
+                    stl04 = setTimeout(function() { $('#sl04').css("width", 0); }, 2000);
+                    maxlevell04--;
+                    if (maxlevell04 < 30) {
+                        maxlevell04 = 30;
+                    }
+                    break;
+                case 'l05':
+                    levell05 = parseInt(data);
+                    if (levell05 > maxlevell05) {
+                        maxlevell05 = levell05;
+                    }
+                    var width = (levell05/maxlevell05)*160;
+                    clearTimeout(stl05);
+                    $('#sl05').css("width", width);
+                    stl05 = setTimeout(function() { $('#sl05').css("width", 0); }, 2000);
+                    maxlevell05--;
+                    if (maxlevell05 < 30) {
+                        maxlevell05 = 30;
+                    }
+                    break;
+                case 'r01':
+                    levelr01 = parseInt(data);
+                    if (levelr01 > maxlevelr01) {
+                        maxlevelr01 = levelr01;
+                    }
+                    var width = (levelr01/maxlevelr01)*160;
+                    clearTimeout(str01);
+                    $('#sr01').css("width", width);
+                    str01 = setTimeout(function() { $('#sr01').css("width", 0); }, 2000);
+                    maxlevelr01--;
+                    if (maxlevelr01 < 30) {
+                        maxlevelr01 = 30;
+                    }
+                    break;
+                case 'r02':
+                    levelr02 = parseInt(data);
+                    if (levelr02 > maxlevelr02) {
+                        maxlevelr02 = levelr02;
+                    }
+                    var width = (levelr02/maxlevelr02)*160;
+                    clearTimeout(str02);
+                    $('#sr02').css("width", width);
+                    str02 = setTimeout(function() { $('#sr02').css("width", 0); }, 2000);
+                    maxlevelr02--;
+                    if (maxlevelr02 < 30) {
+                        maxlevelr02 = 30;
+                    }
+                    break;
+                case 'r03':
+                    levelr03 = parseInt(data);
+                    if (levelr03 > maxlevelr03) {
+                        maxlevelr03 = levelr03;
+                    }
+                    var width = (levelr03/maxlevelr03)*160;
+                    clearTimeout(str03);
+                    $('#sr03').css("width", width);
+                    str03 = setTimeout(function() { $('#sr03').css("width", 0); }, 2000);
+                    maxlevelr03--;
+                    if (maxlevelr03 < 30) {
+                        maxlevelr03 = 30;
+                    }
+                    break;
+                case 'r04':
+                    levelr04 = parseInt(data);
+                    if (levelr04 > maxlevelr04) {
+                        maxlevelr04 = levelr04;
+                    }
+                    var width = (levelr04/maxlevelr04)*160;
+                    clearTimeout(str04);
+                    $('#sr04').css("width", width);
+                    str04 = setTimeout(function() { $('#sr04').css("width", 0); }, 2000);
+                    maxlevelr04--;
+                    if (maxlevelr04 < 30) {
+                        maxlevelr04 = 30;
+                    }
+                    break;
+                case 'r05':
+                    levelr05 = parseInt(data);
+                    if (levelr05 > maxlevelr05) {
+                        maxlevelr05 = levelr05;
+                    }
+                    var width = (levelr05/maxlevelr05)*160;
+                    clearTimeout(str05);
+                    $('#sr05').css("width", width);
+                    str05 = setTimeout(function() { $('#sr05').css("width", 0); }, 2000);
+                    maxlevelr05--;
+                    if (maxlevelr05 < 30) {
+                        maxlevelr05 = 30;
+                    }
+                    break;
+            }
+            break;
+    }
+    console.log("MQTT Message Received: " + message.destinationName);
+    state.packetsin++;
+    mqttconnected = true;
+}
+
+function sendmqtt(topic, packet) {
+    var message = new Paho.MQTT.Message(JSON.stringify(packet));
+    message.destinationName = topic;
+    client.send(message);
+    console.log("MQTT Message Sent "+topic);
+    state.packetsout++;
+}
+
+function sendmessage(topic, value) {
+    sendmqtt(state.ecosystem + "/" + state.system + "/" + topic, value);
+}
+
+////////////
+// Canvas //
+////////////
+
+var l01canvas, l02canvas, l03canvas, l04canvas, l05canvas;
+var r01canvas, r02canvas, r03canvas, r04canvas, r05canvas;
+var scale = 4
+
+function createcanvas() {
+    console.log("Creating Canvases");
+    l01canvas = new Raphael(document.getElementById('ml01'),640/scale,480/scale);
+    l02canvas = new Raphael(document.getElementById('ml02'),640/scale,480/scale);
+    l03canvas = new Raphael(document.getElementById('ml03'),640/scale,480/scale);
+    l04canvas = new Raphael(document.getElementById('ml04'),640/scale,480/scale);
+    l05canvas = new Raphael(document.getElementById('ml05'),640/scale,480/scale);
+
+    r01canvas = new Raphael(document.getElementById('mr01'),640/scale,480/scale);
+    r02canvas = new Raphael(document.getElementById('mr02'),640/scale,480/scale);
+    r03canvas = new Raphael(document.getElementById('mr03'),640/scale,480/scale);
+    r04canvas = new Raphael(document.getElementById('mr04'),640/scale,480/scale);
+    r05canvas = new Raphael(document.getElementById('mr05'),640/scale,480/scale);
+}
+
+function clearcanvas() {
+    $('#ml01').css("background-image", 'none');
+    $('#ml02').css("background-image", 'none');
+    $('#ml03').css("background-image", 'none');
+    $('#ml04').css("background-image", 'none');
+    $('#ml05').css("background-image", 'none');
+
+    $('#mr01').css("background-image", 'none');
+    $('#mr02').css("background-image", 'none');
+    $('#mr03').css("background-image", 'none');
+    $('#mr04').css("background-image", 'none');
+    $('#mr05').css("background-image", 'none');
+}
+
+    </script>
+
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #fff;
+            margin: 10px;
+        }
+        button {
+            margin: 4px 0;
+        }
+        .camera {
+            display: block;
+            float: left;
+            padding: 10px 10px 0 0;
+        }
+        .camera p {
+            font-weight: bold;
+            font-size: 16px;
+            margin: 2px;0
+        }
+        .camera.l01,
+        .camera.r01 {
+            clear: both;
+        }
+        #ml01, #ml02, #ml03, #ml04, #ml05,
+        #mr01, #mr02, #mr03, #mr04, #mr05 {
+            width: 160px;
+            height: 120px;
+            background-color: #000;
+            background-repeat: no-repeat;
+            background-size: 160px 120px;
+        }
+        #sl01, #sl02, #sl03, #sl04, #sl05,
+        #sr01, #sr02, #sr03, #sr04, #sr05 {
+            font-size: 10px;
+            width: 0;
+            height; 10px;
+            background-color: #0f0;
+        }
+    </style>
+</head>
+
+<body onload="createcanvas()">
+    <h1>Luminations Monitor</h1>
+    <div class="controls">
+        <button onclick="sendmqtt('cybecol/esj/all/ping','');">Ping</button>
+        <button onclick="sendmqtt('cybecol/env/all/hello','');">Hello</button>
+        <button onclick="clearcanvas();">Clear</button><br />
+        <button onclick="sendmqtt('cybecol/esj/all/soundon','');">Sound On</button>
+        <button onclick="sendmqtt('cybecol/esj/all/soundoff','');">Sound Off</button>
+        <button onclick="sendmqtt('cybecol/esj/all/samplerate',5);">Rate 5</button>
+        <button onclick="sendmqtt('cybecol/esj/all/samplerate',10);">Rate 10</button>
+        <button onclick="sendmqtt('cybecol/esj/all/threshold',2);">Thr 2</button>
+        <button onclick="sendmqtt('cybecol/esj/all/threshold',4);">Thr 4</button>
+        <button onclick="sendmqtt('cybecol/esj/all/threshold',100);">Thr 100</button><br />
+        <button onclick="sendmqtt('cybecol/esj/all/zoom',1);">Zoom 1</button>
+        <button onclick="sendmqtt('cybecol/esj/all/zoom',2);">Zoom 2</button>
+        <button onclick="sendmqtt('cybecol/esj/all/fps',1);">FPS 1</button>
+        <button onclick="sendmqtt('cybecol/esj/all/fps',5);">FPS 5</button>
+        <button onclick="sendmqtt('cybecol/esj/all/mincontourarea',100);">Area 100</button>
+        <button onclick="sendmqtt('cybecol/esj/all/mincontourarea',500);">Area 500</button>
+        <button onclick="sendmqtt('cybecol/esj/all/mincontourarea',1000);">Area 1000</button>
+    </div>
+    <div class="cameras">
+        <div class="left">
+            <div class="camera l01">
+                <p>l01</p>
+                <div id="ml01"></div>
+                <div id="sl01">&nbsp;</div>
+            </div>
+            <div class="camera l02">
+                <p>l02</p>
+                <div id="ml02"></div>
+                <div id="sl02">&nbsp;</div>
+            </div>
+            <div class="camera l03">
+                <p>l03</p>
+                <div id="ml03"></div>
+                <div id="sl03">&nbsp;</div>
+            </div>
+            <div class="camera l04">
+                <p>l04</p>
+                <div id="ml04"></div>
+                <div id="sl04">&nbsp;</div>
+            </div>
+            <div class="camera l05">
+                <p>l05</p>
+                <div id="ml05"></div>
+                <div id="sl05">&nbsp;</div>
+            </div>
+        </div>
+        <div class="right">
+            <div class="camera r01">
+                <p>r01</p>
+                <div id="mr01"></div>
+                <div id="sr01">&nbsp;</div>
+            </div>
+            <div class="camera r02">
+                <p>r02</p>
+                <div id="mr02"></div>
+                <div id="sr02">&nbsp;</div>
+            </div>
+            <div class="camera r03">
+                <p>r03</p>
+                <div id="mr03"></div>
+                <div id="sr03">&nbsp;</div>
+            </div>
+            <div class="camera r04">
+                <p>r04</p>
+                <div id="mr04"></div>
+                <div id="sr04">&nbsp;</div>
+            </div>
+            <div class="camera r05">
+                <p>r05</p>
+                <div id="mr05"></div>
+                <div id="sr05">&nbsp;</div>
+            </div>
+        </div>
+    </div>
+    <div id="info">&nbsp;</div>
+</body>
+
+</html>

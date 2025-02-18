@@ -1,0 +1,44 @@
+body {
+  font-family: Helvetica, sans-serif;
+  background-color: #fff;
+}
+
+a {
+  color: #000;
+}
+
+.header h1 {
+  margin: 10px 0;
+}
+
+#status {
+  font-family: monospace;
+}
+
+#messages {
+  font-family: monospace;
+  margin-top: 10px;
+}
+
+#controlbar {
+  font-family: monospace;
+  position: fixed;
+  width: 340px;
+  top: 0;
+  right: 0;
+  background-color: #eee;
+  border-left: 1px solid #666;
+  border-bottom: 1px solid #666;
+  padding: 0 10px;
+  display: none;
+}
+#controlbar h1 {
+  font-size: 16px;
+}
+#controlbar h2 {
+  font-size: 14px;
+}
+
+#distantdrums {
+  margin: 10px 0;
+}

@@ -2,120 +2,128 @@
 <html>
 
 <head>
-    <title>artThings Dashboard</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
-    <style>
-        .connection-container {
-            margin: 20px;
-            padding: 15px;
-            border: 1px solid #ccc;
-        }
+	<title>artThings Dashboard</title>
+	<script src="./js/mqttws31.min.js"></script>
+	<style>
+		.connection-container {
+			margin: 20px;
+			padding: 15px;
+			border: 1px solid #ccc;
+		}
 
-        .message {
-            margin: 5px 0;
-            padding: 8px;
-            background-color: #f0f0f0;
-        }
+		.message {
+			margin: 5px 0;
+			padding: 8px;
+			background-color: #f0f0f0;
+		}
 
-        .message-container {
-            margin-top: 20px;
-            padding: 10px;
-            border-top: 1px solid #ccc;
-        }
-    </style>
+		.message-container {
+			margin-top: 20px;
+			padding: 10px;
+			border-top: 1px solid #ccc;
+		}
+	</style>
 </head>
 
 <body>
-    <div class="connection-container">
-        <h2>artThings Dashboard</h2>
-        <div>
-            <label>Broker URL:</label>
-            <input type="text" id="broker" value="localhost">
-            <label>Port:</label>
-            <input type="number" id="port" value="1883">
-            <label>Topic:</label>
-            <input type="text" id="topic" value="#">
-            <button onclick="connect()">Connect</button>
-        </div>
-        <div id="status"></div>
+	<div class="connection-container">
+		<h2>artThings Dashboard</h2>
+		<div class="">
+			<select id="servers">
+				<option>localhost</option>
+				<option>server.local</option>
+				<option>iot.artthings.io</option>
+			</select>
+			<br />
+			<label>Server:</label>
+			<input type="text" id="server" value="iot.artthings.io">
+			<label>Port:</label>
+			<input type="number" id="port" value="8884">
+			<label>SSL:</label>
+			<input type="checkbox" id="usessl" value="true" checked>
+			<label>Topics:</label>
+			<input type="text" id="topic" value="#">
+			<button onclick="connect()">Connect</button>
+		</div>
+		<div id="status"></div>
 
-        <div class="message-container">
-            <h3>Message</h3>
-            <div>
-                <label> Topic:</label>
-                <input type="text" id="publishTopic" value="">
-                <label>Message:</label>
-                <input type="text" id="publishMessage" value="">
-                <button onclick="publishMessage()">Send</button>
-            </div>
-        </div>
+		<div class="message-container">
+			<h3>Message</h3>
+			<div>
+				<label> Topic:</label>
+				<input type="text" id="publishTopic" value="">
+				<label>Message:</label>
+				<input type="text" id="publishMessage" value="">
+				<button onclick="publishMessage()">Send</button>
+			</div>
+		</div>
 
-        <div id="messages"></div>
-    </div>
+		<div id="messages"></div>
+	</div>
 
-    <script>
-        var client;
-        var messageDiv = document.getElementById('messages');
-        var statusDiv = document.getElementById('status');
+	<script>
+		var client;
+		var messageDiv = document.getElementById('messages');
+		var statusDiv = document.getElementById('status');
 
-        function connect() {
-            var broker = document.getElementById('broker').value;
-            var port = parseInt(document.getElementById('port').value);
-            var topic = document.getElementById('topic').value;
+		function connect() {
+			var server = document.getElementById('server').value;
+			var port = parseInt(document.getElementById('port').value);
+			var usessl = document.getElementById('usessl').value;
+			var topic = document.getElementById('topic').value;
 
-            client = new Paho.MQTT.Client(broker, port, "clientId-" + Math.random());
+			client = new Paho.MQTT.Client(server, port, "clientId-" + Math.random());
 
-            client.onConnectionLost = function (responseObject) {
-                if (responseObject.errorCode !== 0) {
-                    statusDiv.innerHTML = "Connection lost: " + responseObject.errorMessage;
-                }
-            };
+			client.onConnectionLost = function (responseObject) {
+				if (responseObject.errorCode !== 0) {
+					statusDiv.innerHTML = "Connection lost: " + responseObject.errorMessage;
+				}
+			};
 
-            client.onMessageArrived = function (message) {
-                var msgElement = document.createElement('div');
-                msgElement.className = 'message';
-                msgElement.innerHTML = `Topic: ${message.destinationName}<br>Message: ${message.payloadString}`;
-                messageDiv.insertBefore(msgElement, messageDiv.firstChild);
-            };
+			client.onMessageArrived = function (message) {
+				var msgElement = document.createElement('div');
+				msgElement.className = 'message';
+				msgElement.innerHTML = `Topic: ${message.destinationName}<br>Message: ${message.payloadString}`;
+				messageDiv.insertBefore(msgElement, messageDiv.firstChild);
+			};
 
-            client.connect({
-                useSSL: false,
-                onSuccess: function () {
-                    statusDiv.innerHTML = "Connected to " + broker;
-                    client.subscribe(topic);
-                },
-                onFailure: function (message) {
-                    statusDiv.innerHTML = "Connection failed: " + message.errorMessage;
-                }
-            });
-        }
+			client.connect({
+				useSSL: true,
+				onSuccess: function () {
+					statusDiv.innerHTML = "Connected to " + server;
+					client.subscribe(topic);
+				},
+				onFailure: function (message) {
+					statusDiv.innerHTML = "Connection failed: " + message.errorMessage;
+				}
+			});
+		}
 
-        // New function to publish messages
-        function publishMessage() {
-            if (!client || !client.isConnected()) {
-                alert("Please connect to broker first!");
-                return;
-            }
+		function publishMessage() {
+			if (!client || !client.isConnected()) {
+				alert("Please connect to broker first!");
+				return;
+			}
 
-            var topic = document.getElementById('publishTopic').value;
-            var message = document.getElementById('publishMessage').value;
+			var topic = document.getElementById('publishTopic').value;
+			var message = document.getElementById('publishMessage').value;
 
-            if (!topic || !message) {
-                alert("Please enter both topic and message!");
-                return;
-            }
+			if (!topic || !message) {
+				alert("Please enter both topic and message!");
+				return;
+			}
 
-            var mqttMessage = new Paho.MQTT.Message(message);
-            mqttMessage.destinationName = topic;
-            client.send(mqttMessage);
+			var mqttMessage = new Paho.MQTT.Message(message);
+			mqttMessage.destinationName = topic;
+			client.send(mqttMessage);
 
-            // Add the sent message to the messages div
-            var msgElement = document.createElement('div');
-            msgElement.className = 'message';
-            msgElement.innerHTML = `<strong>Sent</strong><br>Topic: ${topic}<br>Message: ${message}`;
-            messageDiv.insertBefore(msgElement, messageDiv.firstChild);
-        }
-    </script>
+			// Add the sent message to the messages div
+			var msgElement = document.createElement('div');
+			msgElement.className = 'message';
+			msgElement.innerHTML = `<strong>Sent</strong><br>Topic: ${topic}<br>Message: ${message}`;
+			messageDiv.insertBefore(msgElement, messageDiv.firstChild);
+		}
+	</script>
 </body>
 
 </html>

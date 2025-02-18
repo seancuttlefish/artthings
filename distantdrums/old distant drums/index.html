@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="robots" content="noindex">
+  <title>Distant Drums</title>
+  <script type="text/javascript" src="./js/jquery.min.js"></script>
+  <script type="text/javascript" src="./js/mqttws31.min.js"></script>
+  <script type="text/javascript" src="./js/artthings.js"></script>
+  <script type="text/javascript" src="./js/chance.min.js"></script>
+  <script type="text/javascript" src="./js/tonejs/build/Tone.js"></script>
+  <link rel="stylesheet" type="text/css" href="style.css" />
+  <meta name="viewport" content="user-scalable=no, width=320">
+  <script type="text/javascript">
+    var version = "Dashboard 0.2.0";
+    console.log(version);
+
+    var multipartdata = new Array();
+    multipartdata[0] = "";
+
+    // MQTT Server
+    var SERVERHOST = "192.168.1.100"
+    var SERVERPORT = 8883;
+    var useSSL = false;
+    console.log(SERVERHOST + ":" + SERVERPORT);
+
+    var instanceid = new Chance(Math.random).guid(); // A unique ID for this instance
+    var componentid = "controller";
+    console.log("Instance ID: " + instanceid);
+
+    // Tone Synth
+    var synth = new Tone.MonoSynth().toMaster()
+
+    // artThings State
+    var state = {
+      'id': instanceid,
+      'ecosystem': 'cybecol',
+      'system': 'distantdrums',
+      'component': componentid,
+      'packetsin': 0,
+      'packetsout': 0,
+      'ontime': Math.floor(new Date().getTime() / 1000),
+      'uptime': 0,
+      'status': 'ok'
+    }
+    console.log(state.id);
+
+    var bassok = false;
+    var trebleok = false;
+    var scrollerok = false;
+
+    var mqttconnected = false;
+    var reconnectTimeout = 10000;
+    MQTTConnect();
+
+    function MQTTConnect() {
+      console.log("Connecting..");
+      client = new Paho.MQTT.Client(SERVERHOST, SERVERPORT, "web_" + new Date().getTime());
+      client.onConnectionLost = onConnectionLost;
+      client.onMessageArrived = onMessageArrived;
+      client.connect({
+        useSSL: useSSL,
+        timeout: 10,
+        onSuccess: onSuccess,
+        onFailure: onFailure
+      });
+    }
+
+    function onSuccess() {
+      console.log("MQTT client connected to " + SERVERHOST + ":" + SERVERPORT);
+      mqttconnected = true;
+      $("#status").text("Connected");
+      // Subscribe to core topics
+      client.subscribe("+/+/+/+");
+      // Send state
+      sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+    }
+
+    function onFailure(responseObject) {
+      mqttconnected = false;
+      $("#status").text("Lost Connection");
+      console.log("MQTT Failure: " + responseObject.errorMessage);
+      setTimeout(MQTTConnect(), reconnectTimeout);
+    }
+
+    function onConnectionLost(responseObject) {
+      mqttconnected = false;
+      $("#status").text("Lost Connection");
+      console.log("MQTT Lost connection: " + responseObject.errorMessage);
+      setTimeout(MQTTConnect(), reconnectTimeout);
+    }
+
+    function onMessageArrived(message) {
+      // ecosystem/system/component/event
+      var topics = message.destinationName.split("/");
+      var ecosystem = topics[0];
+      var system = topics[1];
+      var component = topics[2];
+      var event = topics[3];
+
+      var highlight = "#000";
+      var prefix = "";
+      var postfix = "";
+      var image = "";
+      var multipartpacket = false;
+      var multipartcomplete = false;
+
+      try {
+        var packet = JSON.parse(message.payloadString);
+        var sourceid = packet.sourceid;
+        var data = packet.data;
+        if (packet.hasOwnProperty("packetid")) {
+          multipartpacket = true;
+          packet.data = "";
+          var packetid = packet.packetid;
+          var part = packet.part;
+          var parts = packet.parts;
+          if (part == 1) {
+            multipartdata[packetid] = "";
+          }
+          multipartdata[packetid] += data;
+        }
+      } catch (e) {
+        var sourceid = component;
+        var data = packet;
+      }
+
+      // Process events
+      switch (event) {
+        case 'hello': // Hello
+          prefix = ">";
+          state.uptime = Math.floor(new Date().getTime() / 1000) - state.ontime,
+            sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+          highlight = "#999";
+          break;
+        case 'ping': // Ping
+          prefix = ">";
+          highlight = "#999";
+          break;
+        case 'state': // State
+          prefix = "<";
+          highlight = "#00c";
+          break;
+        case 'humidity': // Sensors
+        case 'temperature':
+        case 'light':
+        case 'sound':
+        case 'distance':
+        case 'change':
+        case 'switch':
+        case 'rotation':
+        case 'value':
+          prefix = "<";
+          highlight = "#0c0";
+          break;
+        case 'rgbcolor': // Colour
+          prefix = ">";
+          highlight = "#c00";
+          postfix = "&nbsp;<span style='background-color: rgb(" + packet + ");'>&nbsp;</span>";
+          break;
+        case 'hslcolor':
+          prefix = ">";
+          highlight = "#c00";
+          var hslvalues = packet.split(",");
+          postfix = "&nbsp;<span style='background-color: hsl(" + hslvalues[0] + "," + hslvalues[1] + "%," + hslvalues[2] + "%);'>&nbsp;</span>";
+          break;
+        case 'red':
+          prefix = ">";
+          highlight = "#c00";
+          postfix = "&nbsp;<span style='background-color: rgb(" + packet + ",0,0);'>&nbsp;</span>";
+          break;
+        case 'green':
+          prefix = ">";
+          highlight = "#c00";
+          postfix = "&nbsp;<span style='background-color: rgb(0," + packet + ",0);'>&nbsp;</span>";
+          break;
+        case 'blue':
+          prefix = ">";
+          highlight = "#c00";
+          postfix = "&nbsp;<span style='background-color: rgb(0,0," + packet + ");'>&nbsp;</span>";
+          break;
+        case 'note': // Sound
+          prefix = ">";
+          highlight = "#c00";
+          var notevalues = packet.split(":")[1].split(",");
+          postfix = "&nbsp;<span onmouseenter='playnote(\""+notevalues[0]+"\","+notevalues[1]+");'>&#9835;</span>";
+          playnote(notevalues[0],notevalues[1]);
+          break;
+        case 'text': // Text
+          prefix = ">";
+          highlight = "#c00";
+          break;
+        case 'image': // Images
+          if (multipartpacket) {
+            if (part == parts) {
+              console.log("Parts " + parts + " " + multipartdata[packetid].length);
+              image = "<img src=\"" + multipartdata[packetid] + "\" ><br />";
+              delete multipartdata[packetid];
+              multipartcomplete = true;
+            }
+          } else {
+            image = "<img src=\"" + data + "\" ><br />";
+          }
+          prefix = ">";
+          highlight = "#c00";
+          break;
+      }
+
+      if ((multipartpacket == false) || multipartcomplete) {
+        var messages = "<b style='color: " + highlight + "'>" + prefix + " " + message.destinationName + "</b> " + JSON.stringify(packet) + postfix + "<br />" + image + $('#messages').html();
+        $('#messages').html(messages);
+        console.log("MQTT: received " + message.destinationName);
+      }
+      state.packetsin++;
+    }
+
+    function sendmessage(topic, value) {
+      sendmqtt(state.ecosystem + "/" + state.system + "/" + topic, value);
+    }
+
+    function sendcolour() {
+      sendmqtt(state.ecosystem+"/"+state.system+"/all/"+$("#ccolour").children("option:selected").val(), $("#cvalue").children("option:selected").val());
+    }
+
+    function sendnote() {
+      sendmqtt(state.ecosystem+"/"+state.system+"/all/note", $("#nchannel").children("option:selected").val()+":"+$("#nnote").children("option:selected").val()+$("#noctave").children("option:selected").val()+","+$("#ntime").children("option:selected").val());
+    }
+
+    function playnote(note, duration) {
+      synth.triggerAttackRelease(note, duration+'n');
+    }
+
+    $('html').keypress(function(event) {
+      switch (event.charCode) {
+        case 99:
+          $('#controlbar').toggle();
+          break;
+      }
+    });
+  </script>
+</head>
+
+<body class="dashboard">
+  <div class="header">
+    <h1>Distant Drums</h1>
+  </div>
+  <div class="body">
+    <div id="status">&nbsp;</div>
+    <div id="distantdrums">
+      <button class="big" onclick="sendmessage('all/hello','');">hello</button>
+      <button class="big" onclick="sendmessage('controller/play','');">play</button>
+      <button class="big" onclick="sendmessage('controller/stop','');">stop</button>
+      <button class="big" onclick="sendmessage('controller/reload','');">reload</button><br /><br />
+      <button class="big" onclick="sendmessage('controller/voldown','');">Vol -</button>
+      <button class="big" onclick="sendmessage('controller/volup','');">Vol +</button><br /><br />
+      <button class="big" onclick="sendmessage('controller/brightnessdown','');">Brightness -</button>
+      <button class="big" onclick="sendmessage('controller/brightnessup','');">Brightness +</button><br />
+    </div>
+    <div id="messages"></div>
+    <div id="controlbar">
+      <h1>cybecol/env/</h1>
+      <h2>Control</h2>
+      <button onclick="sendmessage('all/hello','');">all/hello</button>
+      <button onclick="sendmessage('sensor/ping','');">sensor/ping</button>
+      <button onclick="sendmessage('webcam/ping','');">webcam/ping</button>
+      <h2>Colour</h2>
+      <p>
+        <b>all/rbgcolor</b>&nbsp;<select id="r">
+        <option>0</option>
+        <option>51</option>
+        <option>102</option>
+        <option>153</option>
+        <option>204</option>
+        <option>255</option>
+        </select>,<select id="g">
+        <option>0</option>
+        <option>51</option>
+        <option>102</option>
+        <option>153</option>
+        <option>204</option>
+        <option>255</option>
+        </select>,<select id="b">
+        <option>0</option>
+        <option>51</option>
+        <option>102</option>
+        <option>153</option>
+        <option>204</option>
+        <option>255</option>
+        </select>&nbsp;<button onclick="sendmessage('all/rgbcolor','255,0,0');">send</button>
+      </p>
+      <p>
+        <b>all/hslcolor</b>&nbsp;<button onclick="sendmessage('all/hslcolor','0,100,50');">all/hslcolor 0,100,50</button>
+      </p>
+      <p><b>all/</b><select id="ccolour">
+        <option>red</option>
+        <option>green</option>
+        <option>blue</option>
+      </select>&nbsp;<select id="cvalue">
+        <option>0</option>
+        <option>51</option>
+        <option>102</option>
+        <option>153</option>
+        <option>204</option>
+        <option>255</option>
+        </select>&nbsp;<button onclick="sendcolour();">send</button></p>
+      <h2>Sound</h2>
+      <p><b>all/note</b> "channel:note,time"</p>
+      <select id="nchannel">
+        <option>0</option>
+        <option>1</option>
+        <option>2</option>
+        <option>3</option>
+        <option>4</option>
+        <option>5</option>
+        <option>6</option>
+        <option>7</option>
+        <option>8</option>
+        <option>9</option>
+      </select>:<select id="nnote">
+        <option>C</option>
+        <option>C#</option>
+        <option>D</option>
+        <option>D#</option>
+        <option>E</option>
+        <option>F</option>
+        <option>F#</option>
+        <option>G</option>
+        <option>G#</option>
+        <option>A</option>
+        <option>A#</option>
+        <option>B</option>
+      </select><select id="noctave">
+        <option>2</option>
+        <option>3</option>
+        <option>4</option>
+        <option>5</option>
+        <option>6</option>
+      </select>,<select id="ntime">
+        <option>16</option>
+        <option>8</option>
+        <option>4</option>
+        <option>2</option>
+        <option>1</option>
+      </select>&nbsp;<button onclick="sendnote();">send</button>
+      <h2>Text</h2>
+      <p><b>all/text</b> "channel:text"</p>
+      <button onclick="sendmessage('all/text','0:hello');">all/text 0:hello</button>
+      <button onclick="sendmessage('all/text','0:goodbye');">all/text 0:goodbye</button>
+      <h2>Image</h2>
+      <button>all/image test1.jpg</button>
+      <button>all/image test2.jpg</button>
+      <p><button onclick="$('#messages').html('');">clear</button></p>
+    </div>
+  </div>
+  <div class="footer"></div>
+</body>
+
+</html>

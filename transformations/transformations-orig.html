@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="robots" content="noindex">
+	<title>Transformations - Sean Clark</title>
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-title" content="Transformations">
+	<meta name="viewport" content="width=device-width,height=device-height">
+	<link rel="stylesheet" href="transformations.css" type="text/css" />
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+	<script type="text/javascript" src="/js/jquery-ui.min.js"></script>
+	<script type="text/javascript" src="/js/raphael/raphael-min.js"></script>
+	<script type="text/javascript" src="/js/moment.js"></script>
+	<script type="text/javascript" src="/js/artsys.js"></script>
+	<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+	<script type='text/javascript'>
+
+	//////////////////////////////////////
+	// Transformations - Order by H,S,L //
+	//                                  //
+	// Sean Clark                       //
+	// art.systems                      //
+	// 2016                             //
+	// Updated October 2020 to remove   //
+	// outdated colour service and fix  //
+	// compatability issues with newer  //
+	// systems. No longer active code.  //
+	//////////////////////////////////////
+
+	// TO DO
+	// - allow grid size to be set
+	//
+	// - Packets to carry full data? (including attached file)
+	// - add audio?
+	// - keyboard displays info / changes views?
+	//
+	// t = toggle side by side / overlay views
+	// r = reset colours
+	// p = stop / go
+	// i = information overlay
+
+	var paper;
+	var cells = [];
+	var innerborder;
+	var outerborder;
+	var imagename;
+	var debug = false;
+
+	var gridw;
+	var gridh;
+	var gridt;
+	var gridl;
+	var cellw;
+	var cellh;
+	var gridox;
+	var gridoy;
+
+	var rows = 5;
+	var columns = 5;
+	var gridsize = rows*columns;
+
+	var selectedImage = parseInt(getParameterByName('image')) || 0;
+	var imageScale = parseInt(getParameterByName('scale')) || 1;
+	var aspectRatio = parseFloat(getParameterByName('aspect')) || 1;
+	var imagexoffset = parseInt(getParameterByName('imagexoffset')) || 0;
+	var imageyoffset = parseInt(getParameterByName('imageyoffset')) || 0;
+
+	// Sensor data
+	var light;
+	var sound;
+	var humidity;
+	var temperature;
+	var oldlight;
+	var oldsound;
+	var oldhumidity;
+	var oldtemperature;
+
+	// Set zoom level
+	//zoom.attr({
+	//	zoom: imageScale
+	//});
+
+	// images.length = 1, 2, 3, 4
+	// view = 1 (Side by side), 2 (Overlay)
+	// linethickness = actual line thickness is cellw divided by this value
+	// paperborder = extra space around the paper as an absolute pixel value
+	// innerborder = actual innerborder is screenwidth or screenheight divided by this value
+	// outerborder = actual outerborder is screenwidth or screenheight divided by this value
+	// connected = yes (1), no (0)
+	// year = creation year
+
+	// rule = h, s, l
+	// shape = s, t1, t2, t3, t4, c, l1, l2, l3, l4
+	// orientation = orientation of grid
+	// hrotation = rotate using hue: yes (1), no (0).
+	// rate = heartbeat rate in ms
+	// delay = how many heartbeats to wait once organised
+	// palette = palette number in getColour
+	// cellgap = actual cellgap is cellw divided by this value
+	// cellox = cell offset x, is cellw divided by this value
+	// celloy = cell offset y, is cellw divided by this value
+	// order = f, r
+
+	// Image settings
+	var parameters = [
+		// 0
+		{"view": 1, "linethickness": 10, "paperborder": 100, "innerborder": 16, "outerborder": 5, "connected": 0, "year": "2015", "images": [
+			{"rule": "l", "shape": "s", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		// 1
+		{"view": 2, "linethickness": 10, "paperborder": 100, "innerborder": 10, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 2.8, "cellox": -10, "celloy": -10, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 2.8, "cellox": 0,   "celloy": 0,   "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 2.8, "cellox": 10,  "celloy": 10,  "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		// 2
+		{"view": 1, "linethickness": 10, "paperborder": 100, "innerborder": 0,  "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "t4", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 30, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "t1", "orientation": 3, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 30, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "t2", "orientation": 3, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 30, "cellox": 0, "celloy": 0, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "t3", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 30, "cellox": 0, "celloy": 0, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		// 3
+		{"view": 2, "linethickness": 10, "paperborder": 100, "innerborder": 10, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "l1", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 0, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "l2", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 0, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "l3", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 0, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		// 4
+		{"view": 1, "linethickness": 10, "paperborder": 100, "innerborder": 0,  "outerborder": 8, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "c", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 20, "palette": 0, "cellgap": 30, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "c", "orientation": 3, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 20, "palette": 0, "cellgap": 30, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "c", "orientation": 3, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 20, "palette": 0, "cellgap": 30, "cellox": 0, "celloy": 0, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "c", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 20, "palette": 0, "cellgap": 30, "cellox": 0, "celloy": 0, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		// 5
+		{"view": 2, "linethickness": 10, "paperborder": 100, "innerborder": 0,  "outerborder": 5, "connected": 0, "year": "2016", "images": [
+			{"rule": "h", "shape": "c", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 20, "palette": 0, "cellgap": 2, "cellox": 0, "celloy": 0, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 3, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 20, "palette": 0, "cellgap": 4, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "l1", "orientation": 2, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 20, "palette": 0, "cellgap": 0, "cellox": 0, "celloy": 0, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "l2", "orientation": 4, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 20, "palette": 0, "cellgap": 0, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		// 6-8 Squares
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 0, "cellgap": 4, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 1, "cellgap": 4, "cellox": -20, "celloy": -20, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 2, "cellgap": 4, "cellox": 20, "celloy": 20, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 0, "cellgap": 4, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		// 9-11 Triangles
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "t1", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 0, "cellgap": 2, "cellox": -10, "celloy": 10, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "l", "shape": "t2", "orientation": 2, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 0, "cellgap": 2, "cellox": 10, "celloy": -10, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "t1", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 3, "cellgap": 2, "cellox": -10, "celloy": 10, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "l", "shape": "t2", "orientation": 2, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 4, "cellgap": 2, "cellox": 10, "celloy": -10, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "t3", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 5, "cellgap": 2, "cellox": -10, "celloy": 10, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "l", "shape": "t4", "orientation": 2, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 6, "cellgap": 2, "cellox": 10, "celloy": -10, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "t3", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 0, "cellgap": 2, "cellox": -10, "celloy": 10, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "l", "shape": "t4", "orientation": 2, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 0, "cellgap": 2, "cellox": 10, "celloy": -10, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		// 12-14 Circles
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "c", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 0, "cellgap": 1.8, "cellox": -4, "celloy": 4, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "c", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 0, "cellgap": 1.8, "cellox": 4, "celloy": -4, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "c", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 7, "cellgap": 1.8, "cellox": -4, "celloy": 4, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "c", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 8, "cellgap": 1.8, "cellox": 4, "celloy": -4, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "c", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 9, "cellgap": 1.8, "cellox": -4, "celloy": -4, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "c", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 10, "cellgap": 1.8, "cellox": 4, "celloy": 4, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "c", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 0, "cellgap": 1.8, "cellox": -4, "celloy": -4, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "c", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 0, "cellgap": 1.8, "cellox": 4, "celloy": 4, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		// 15-17 Lines
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "l1", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 0, "cellgap": 2.8, "cellox": -4, "celloy": 4, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "l", "shape": "l2", "orientation": 2, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 0, "cellgap": 2.8, "cellox": 4, "celloy": -4, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "l1", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 11, "cellgap": 2.8, "cellox": -4, "celloy": 4, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "l", "shape": "l2", "orientation": 2, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 12, "cellgap": 2.8, "cellox": 4, "celloy": -4, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "l3", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 13, "cellgap": 2.8, "cellox": -4, "celloy": 4, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "l", "shape": "l4", "orientation": 2, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 14, "cellgap": 2.8, "cellox": 4, "celloy": -4, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "l3", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 0, "cellgap": 2.8, "cellox": -4, "celloy": 4, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "l", "shape": "l4", "orientation": 2, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 0, "cellgap": 2.8, "cellox": 4, "celloy": -4, "order": "b", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		// 18-20 Lines and Squares
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "l", "shape": "l1", "orientation": 2, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 0, "cellgap": 1000, "cellox": 0, "celloy": 0, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "l", "shape": "l2", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 0, "cellgap": 1000, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "l", "shape": "l1", "orientation": 2, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 15, "cellgap": 1000, "cellox": 0, "celloy": 0, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "l", "shape": "l2", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 16, "cellgap": 1000, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 17, "cellgap": 1000, "cellox": 0, "celloy": 0, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 100, "delay": 50, "palette": 0, "cellgap": 1000, "cellox": 0, "celloy": 0, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		// 21-23 Big Circles, Little Circles
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "c", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 50, "palette": 0, "cellgap": 1.2, "cellox": -4, "celloy": 4, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "l", "shape": "c", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 50, "palette": 0, "cellgap": 1.2, "cellox": 4, "celloy": -4, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "c", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 50, "palette": 18, "cellgap": 1.2, "cellox": -4, "celloy": 4, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "l", "shape": "c", "orientation": 1, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 50, "palette": 19, "cellgap": 1.2, "cellox": 4, "celloy": -4, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "c", "orientation": 2, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 50, "palette": 20, "cellgap": 5, "cellox": -4, "celloy": 4, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "l", "shape": "c", "orientation": 2, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 50, "palette": 21, "cellgap": 5, "cellox": 4, "celloy": -4, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 2, "linethickness": 10, "paperborder": 50, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2016", "images": [
+			{"rule": "h", "shape": "c", "orientation": 2, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 50, "palette": 0, "cellgap": 5, "cellox": -4, "celloy": 4, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "l", "shape": "c", "orientation": 2, "hrotation": 0, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 50, "palette": 0, "cellgap": 5, "cellox": 4, "celloy": -4, "order": "b", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		// 24-26 Rotated Squares
+		{"view": 2, "linethickness": 10, "paperborder": 100, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2017", "images": [
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "rate": 100, "delay": 50, "palette": 34, "cellgap": 4, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "rate": 100, "delay": 50, "palette": 0, "cellgap": 4, "cellox": 0, "celloy": 0, "order": "r", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+		]},
+		{"view": 2, "linethickness": 10, "paperborder": 100, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2017", "images": [
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "rate": 100, "delay": 50, "palette": 0, "cellgap": 4, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "rate": 100, "delay": 50, "palette": 0, "cellgap": 4, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+		]},
+		{"view": 2, "linethickness": 10, "paperborder": 100, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2017", "images": [
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "rate": 100, "delay": 50, "palette": 0, "cellgap": 4, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "rate": 100, "delay": 50, "palette": 0, "cellgap": 4, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+		]},
+		// 27-29
+		{"view": 1, "linethickness": 10, "paperborder": 100, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2017", "images": [
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 1, "linethickness": 10, "paperborder": 100, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2017", "images": [
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 1, "linethickness": 10, "paperborder": 100, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2017", "images": [
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 32, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 33, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 34, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		// 30-32
+		{"view": 1, "linethickness": 10, "paperborder": 100, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2017", "images": [
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 33, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 33, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 1, "linethickness": 10, "paperborder": 100, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2017", "images": [
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 33, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 1, "linethickness": 10, "paperborder": 100, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2017", "images": [
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 33, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 33, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		// 33-35
+		{"view": 1, "linethickness": 10, "paperborder": 100, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2017", "images": [
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 34, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 34, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 1, "linethickness": 10, "paperborder": 100, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2017", "images": [
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 34, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]},
+		{"view": 1, "linethickness": 10, "paperborder": 100, "innerborder": 16, "outerborder": 5, "connected": 1, "year": "2017", "images": [
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 0, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 34, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0},
+			{"rule": "h", "shape": "s", "orientation": 1, "hrotation": 1, "ssize": 0, "lopacity": 0, "rate": 200, "delay": 20, "palette": 34, "cellgap": 50, "cellox": 0, "celloy": 0, "order": "f", "node_uuid": "", "parent_node_uuid": "461530A0-D271-4D1F-AC7E-3DE702384BF5", "cookie": "", "name": "", "counter": 0, "arrayoffset": 0}
+		]}
+	];
+
+		// Haze
+		// Palette 22, 23, 24
+
+		// Cities Tango II
+		// Palette 25, 26, 27
+
+		// Others (eg. Genetic Moo)
+		// Palette 28, 29, 30
+
+		// LED Sensors
+		// Greys (0,0%,{20%|40%|60%})
+
+	var offlineColour = "hsl(0,0%,0%)";
+	//setCookie("offlineColour",offlineColour,3650);
+	localStorage.clear();
+
+	if (debug) {
+		console.log("Image "+selectedImage+" "+parameters[selectedImage].images.length+" "+parameters[selectedImage].view+" ");
+	}
+
+	function heartbeat(node) {
+		// Organise the image according to its rules
+		for (var i=0; i<(gridsize-1); i++) {
+			var tempColour1 = localStorage.getItem(parameters[selectedImage].images[node].cookie+"_cell"+eval(parameters[selectedImage].images[node].arrayoffset+i));
+			var tempColour2 = localStorage.getItem(parameters[selectedImage].images[node].cookie+"_cell"+eval(parameters[selectedImage].images[node].arrayoffset+(i+1)));
+
+			var colourValues1 = tempColour1.split(",");
+			var colourValues2 = tempColour2.split(",");
+			var h1 = parseInt(colourValues1[0].substring(4));
+			var h2 = parseInt(colourValues2[0].substring(4));
+			var s1 = parseInt(colourValues1[1]);
+			var s2 = parseInt(colourValues2[1]);
+			var l1 = parseInt(colourValues1[2]);
+			var l2 = parseInt(colourValues2[2]);
+
+			if (parameters[selectedImage].images[node].order == "r") { // Reverse order
+				h1 = 360-h1;
+				s1 = 100-s1;
+				l1 = 100-l1;
+				h2 = 360-h2;
+				s2 = 100-s2;
+				l2 = 100-l2;
+			}
+
+			if (((parameters[selectedImage].images[node].rule == "h") && (h1 > h2)) ||
+				((parameters[selectedImage].images[node].rule == "s") && (s1 > s2)) ||
+				((parameters[selectedImage].images[node].rule == "l") && (l1 > l2))) {
+				localStorage.setItem(parameters[selectedImage].images[node].cookie+"_cell"+eval(parameters[selectedImage].images[node].arrayoffset+i),tempColour2);
+				localStorage.setItem(parameters[selectedImage].images[node].cookie+"_cell"+eval(parameters[selectedImage].images[node].arrayoffset+(i+1)),tempColour1);
+
+				r1 = 0;
+				r2 = 0;
+				if (parameters[selectedImage].images[node].hrotation) {
+					r1 = h1;
+					r2 = h2;
+				}
+
+				if ((parameters[selectedImage].images[node].shape == "l1") || (parameters[selectedImage].images[node].shape == "l2") || (parameters[selectedImage].images[node].shape == "l3") || (parameters[selectedImage].images[node].shape == "l4")) {
+					cells[eval(parameters[selectedImage].images[node].arrayoffset+i)].attr({
+						stroke: tempColour2.replace('%',''),
+						transform: "r"+r2
+					});
+					cells[eval(parameters[selectedImage].images[node].arrayoffset+i+1)].attr({
+						stroke: tempColour1.replace('%',''),
+						transform: "r"+r1
+					});
+				}
+				else {
+					cells[eval(parameters[selectedImage].images[node].arrayoffset+i)].attr({
+						fill: tempColour2.replace('%',''),
+						transform: "r"+r2
+					});
+					cells[eval(parameters[selectedImage].images[node].arrayoffset+i+1)].attr({
+						fill: tempColour1.replace('%',''),
+						transform: "r"+r1
+					});
+				}
+				break;
+			}
+		}
+
+		// When the image is fully organised swap a colour with the server after delay heartbeats
+		if (i == (gridsize-1)) {
+			// Start counting heartbeats
+			parameters[selectedImage].images[node].counter++;
+
+			if (parameters[selectedImage].images[node].counter == parameters[selectedImage].images[node].delay) {
+				// Choose a colour to swap
+				var newPos1 = Math.floor(Math.random()*gridsize);
+				var tempColour1 = localStorage.getItem(parameters[selectedImage].images[node].cookie+"_cell"+eval(parameters[selectedImage].images[node].arrayoffset+newPos1));
+				var colourValues = tempColour1.split(",");
+				var h = parseInt(colourValues[0].substring(4));
+				var s = parseInt(colourValues[1]);
+				var l = parseInt(colourValues[2]);
+
+				/* if (parameters[selectedImage].connected) {
+					$.ajax({ // GET newColour from server
+						method: "GET",
+						url: "/api/v1/packets",
+						data: {
+							node_uuid: parameters[selectedImage].images[node].node_uuid,
+							parent_node_uuid: parameters[selectedImage].images[node].parent_node_uuid,
+							packet_uuid: generateUUID(),
+							h: h,
+							s: s,
+							l: l,
+							random: Math.floor(Math.random()*1000000000000),
+							timeout: 10000
+						},
+						success: function(data) {
+							var resultscount;
+							if (typeof(data.results) === 'undefined') {
+								resultscount = 0;
+							}
+							else {
+								resultscount = data.results.length;
+							}
+							if ((data.debug) && debug) {
+								console.log((data.debug));
+							}
+
+							if (resultscount) {
+								var newh = data.results[0].h;
+								var news = data.results[0].s;
+								var newl = data.results[0].l;
+								var newColour = "hsl("+newh+","+news+"%,"+newl+"%)";
+
+								// Do I already have one of these? If so, transform it in to one of my colours
+								for (var j=0; j<gridsize; j++) {
+									if (newColour == localStorage.getItem(parameters[selectedImage].images[node].cookie+"_cell"+eval(parameters[selectedImage].images[node].arrayoffset+j))) {
+										console.log(node+": Duplicate Packet Spotted " +newColour);
+										newColour = getColour(parameters[selectedImage].images[node].palette);
+										console.log(node+": Transformed Into " +newColour);
+									}
+								}
+	localStorage.setItem(parameters[selectedImage].images[node].cookie+"_cell"+eval(parameters[selectedImage].images[node].arrayoffset+newPos1),newColour);
+
+								cells[parameters[selectedImage].images[node].arrayoffset+newPos1].attr({
+									fill: newColour.replace('%','')
+								});
+
+								//if (debug) {
+									console.log(node+": Swapping colour with server "+tempColour1+" "+newColour);
+								//}
+								parameters[selectedImage].images[node].counter = 0;
+								triggerheartbeat(node);
+							}
+							else {
+								var offlineColour = getCookie("offlineColour");
+								localStorage.setItem(parameters[selectedImage].images[node].cookie+"_cell"+eval(parameters[selectedImage].images[node].arrayoffset+newPos1),offlineColour);
+								setCookie("offlineColour",tempColour1,3650);
+
+								cells[parameters[selectedImage].images[node].arrayoffset+newPos1].attr({
+									fill: offlineColour.replace('%','')
+								});
+
+								//if (debug) {
+									console.log(node+": No colours on server. Using local value "+offlineColour+" "+tempColour1);
+								//}
+								parameters[selectedImage].images[node].counter = 0;
+								triggerheartbeat(node);
+							}
+						},
+						error: function() {
+							var offlineColour = getCookie("offlineColour");
+	localStorage.setItem(parameters[selectedImage].images[node].cookie+"_cell"+eval(parameters[selectedImage].images[node].arrayoffset+newPos1),offlineColour);
+							setCookie("offlineColour",tempColour1,3650);
+
+							cells[parameters[selectedImage].images[node].arrayoffset+newPos1].attr({
+								fill: offlineColour.replace('%','')
+							});
+
+							if (debug) {
+								console.log(node+": Unable to communicate with server. Using local value "+offlineColour+" "+tempColour1);
+							}
+							parameters[selectedImage].images[node].counter = 0;
+							triggerheartbeat(node);
+						}
+					});
+				}
+				else { */
+					//offlineColour = getCookie("offlineColour");
+console.log("Swap Colour: "+offlineColour);
+				localStorage.setItem(parameters[selectedImage].images[node].cookie+"_cell"+eval(parameters[selectedImage].images[node].arrayoffset+newPos1),offlineColour);
+					//setCookie("offlineColour",tempColour1,3650);
+					offlineColour = tempColour1;
+
+					cells[parameters[selectedImage].images[node].arrayoffset+newPos1].attr({
+						fill: offlineColour.replace('%',''),
+					});
+
+					if (debug) {
+						console.log(node+": Running in non-connected mode. Using local value "+offlineColour+" "+tempColour1);
+					}
+					parameters[selectedImage].images[node].counter = 0;
+					triggerheartbeat(node); /*
+				} */
+			}
+			else {
+					triggerheartbeat(node);
+			}
+		}
+		else {
+			triggerheartbeat(node);
+		}
+	}
+
+	function triggerheartbeat(node) {
+		switch (node) {
+			case 3:
+				setTimeout(heartbeat3,parameters[selectedImage].images[3].rate);
+				break;
+			case 2:
+				setTimeout(heartbeat2,parameters[selectedImage].images[2].rate);
+				break;
+			case 1:
+				setTimeout(heartbeat1,parameters[selectedImage].images[1].rate);
+				break;
+			default:
+				setTimeout(heartbeat0,parameters[selectedImage].images[0].rate);
+				break;
+		}
+	}
+
+	function heartbeat0() {
+		heartbeat(0);
+	}
+	function heartbeat1() {
+		heartbeat(1);
+	}
+	function heartbeat2() {
+		heartbeat(2);
+	}
+	function heartbeat3() {
+		heartbeat(3);
+	}
+
+	function drawcanvas() {
+		// Calculate canvas size
+		var screenwidth = window.innerWidth;
+		var screenheight = window.innerHeight;
+		if (parameters[selectedImage].outerborder == 0) {
+			outerborder = 0;
+		}
+		else {
+			outerborder = screenheight/parameters[selectedImage].outerborder;
+		}
+		if (parameters[selectedImage].innerborder == 0) {
+			innerborder = 0;
+		}
+		else {
+			innerborder = screenheight/parameters[selectedImage].innerborder;
+		}
+		if ((parameters[selectedImage].images.length == 1) || (parameters[selectedImage].view == 2)) {
+			if (screenwidth > screenheight) {
+				gridh = screenheight-outerborder;
+			}
+			else {
+				gridh = screenwidth-outerborder;
+			}
+			cellw = Math.floor(gridh/5);
+			cellh = cellw;
+			gridh = cellw*5;
+			gridw = gridh;
+		}
+		if ((parameters[selectedImage].images.length == 2) && (parameters[selectedImage].view == 1)) {
+			gridw = screenwidth-outerborder;
+			gridh = (gridw-innerborder)/2;
+			cellw = Math.floor(gridh/5);
+			cellh = cellw;
+			gridh = cellw*5;
+			gridw = gridh*2+innerborder;
+		}
+		if ((parameters[selectedImage].images.length == 3) && (parameters[selectedImage].view == 1)) {
+			gridw = screenwidth-outerborder;
+			gridh = (gridw-innerborder*2)/3;
+			cellw = Math.floor(gridh/5);
+			cellh = cellw;
+			gridh = cellw*5;
+			gridw = gridh*3+innerborder*2;
+		}
+		if ((parameters[selectedImage].images.length == 4) && (parameters[selectedImage].view == 1)) {
+			if (screenwidth > screenheight) {
+				gridh = screenheight-outerborder;
+			}
+			else {
+				gridh = screenwidth-outerborder;
+			}
+			cellw = Math.floor((gridh-innerborder)/10);
+			cellh = cellw;
+			gridh = cellw*10+innerborder;
+			gridw = gridh;
+		}
+		if ((gridh < 0) || (gridw < 0)) {
+			gridh = 0;
+			gridw = 0;
+		}
+
+		// Adjust for non-square pixels
+		gridw = gridw*aspectRatio;
+		cellw = cellw*aspectRatio;
+
+		// Grid top and left
+		gridt = Math.floor((screenheight-gridh)/2)+imageyoffset;
+		gridl = Math.floor((screenwidth-gridw)/2)+imagexoffset;
+		if (debug) {
+			console.log("Canvas Size "+gridw+"x"+gridh+", Top Left "+gridt+" "+gridl+", Cell Size "+cellw+"x"+cellh);
+		}
+
+		// Re-create canvas
+		var paperDom = paper.canvas;
+		paperDom.parentNode.removeChild(paperDom);
+		paper = Raphael(gridl-parameters[selectedImage].paperborder,gridt-parameters[selectedImage].paperborder,gridw+parameters[selectedImage].paperborder*2,gridh+parameters[selectedImage].paperborder*2);
+
+		// Add title to canvas
+		/* var title = paper.text(parameters[selectedImage].paperborder/2,gridh+parameters[selectedImage].paperborder*1.5,imagename).attr({
+			"font-family": "Georgia",
+			"font-size": "18px",
+			"font-weight": "normal",
+			"fill": "#eee",
+			"stroke":"#eee",
+			"stroke-width": "0px",
+			"text-anchor": "start" ,
+			"font-style": "normal"
+		}); */
+	}
+
+	function drawimage(node) {
+		// Draw the packets
+		if (parameters[selectedImage].images[node].cellox == 0) {
+			var cellox = 0;
+		}
+		else {
+			var cellox = cellw/parameters[selectedImage].images[node].cellox;
+		}
+		if (parameters[selectedImage].images[node].celloy == 0) {
+			var celloy = 0;
+		}
+		else {
+			var celloy = cellh/parameters[selectedImage].images[node].celloy;
+		}
+
+		// Calculate the offsets
+		if ((node == 0) || (parameters[selectedImage].view == 2)) {
+			gridox = 0+cellox;
+			gridoy = 0+celloy;
+		}
+		if ((node == 1) && (parameters[selectedImage].view == 1)) {
+			gridox = cellw*5+innerborder+cellox;
+			gridoy = 0+celloy;
+		}
+		if ((node == 2) && (parameters[selectedImage].view == 1)) {
+			if (parameters[selectedImage].images.length == 3) {
+				gridox = cellw*10+innerborder*2+celloy;
+				gridoy = 0+celloy;
+			}
+			else {
+				gridox = 0+cellox;
+				gridoy = cellw*5+innerborder+celloy;
+			}
+		}
+		if ((node == 3) && (parameters[selectedImage].view == 1)) {
+			gridox = cellw*5+innerborder+cellox;
+			gridoy = cellw*5+innerborder+celloy;
+		}
+
+		// Calculate the cell gap for the grid
+		if (parameters[selectedImage].images[node].cellgap == 0) {
+			cellg = 0;
+		}
+		else {
+			var cellg = cellh/parameters[selectedImage].images[node].cellgap;
+		}
+		if (debug) {
+			console.log(node+": Cell Gap "+cellg+" Cellox "+cellox+" Celloy "+celloy);
+		}
+
+		for (var i=0; i<gridsize; i++) {
+			// Grid orientation
+			switch (parseInt(parameters[selectedImage].images[node].orientation)) {
+				case 1:
+					var y = Math.floor(i/5);
+					var x = i-(y*5);
+					if ((y == 1) || (y == 3)) {
+						x = 4-x;
+					}
+					break;
+				case 2:
+					var x = Math.floor(i/5);
+					var y = i-(x*5);
+					if ((x == 1) || (x == 3)) {
+						y = 4-y;
+					}
+					x = 4-x;
+					break;
+				case 3:
+					var y = Math.floor(i/5);
+					var x = i-(y*5);
+					if ((y == 1) || (y == 3)) {
+						x = 4-x;
+					}
+					x = 4-x;
+					break;
+				case 4:
+					var x = Math.floor(i/5);
+					var y = i-(x*5);
+					if ((x == 1) || (x == 3)) {
+						y = 4-y;
+					}
+					x = 4-x;
+					y = 4-y;
+					break;
+			}
+
+			var imageColour = localStorage.getItem(parameters[selectedImage].images[node].cookie+"_cell"+eval(parameters[selectedImage].images[node].arrayoffset+i));
+			if (imageColour == null) {
+				imageColour = getColour(parameters[selectedImage].images[node].palette);
+				localStorage.setItem(parameters[selectedImage].images[node].cookie+"_cell"+eval(parameters[selectedImage].images[node].arrayoffset+i),imageColour);
+			}
+			var r = 0;
+			if (parameters[selectedImage].images[node].hrotation) {
+				var colourValues = imageColour.split(",");
+				r = parseInt(colourValues[0].substring(4));
+			}
+			var strokew = Math.floor(cellw/parameters[selectedImage].linethickness);
+			var strokeh = Math.floor(cellh/parameters[selectedImage].linethickness);
+
+			var tempColour = localStorage.getItem(parameters[selectedImage].images[node].cookie+"_cell"+eval(parameters[selectedImage].images[node].arrayoffset+i));
+
+			switch (parameters[selectedImage].images[node].shape) {
+				case "s":
+					cells[eval(parameters[selectedImage].images[node].arrayoffset+i)] = paper.rect(x*cellw+(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder,y*cellh+cellg/2+gridoy+parameters[selectedImage].paperborder,cellw-(cellg*aspectRatio),cellh-cellg)
+						.attr({
+							fill: imageColour.replace('%',''),
+							stroke: "none",
+							transform: "r"+r
+						});
+					break;
+				case "t1":
+					cells[eval(parameters[selectedImage].images[node].arrayoffset+i)] = paper.path('M '+(x*cellw+(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+(y*cellh+cellg/2+gridoy+parameters[selectedImage].paperborder)+' L '+((x+1)*cellw-(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+((y+1)*cellh-cellg/2+gridoy+parameters[selectedImage].paperborder)+' L '+(x*cellw+(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+((y+1)*cellh-cellg/2+gridoy+parameters[selectedImage].paperborder)+' Z')
+						.attr({
+							fill: imageColour.replace('%',''),
+							stroke: "none",
+							transform: "r"+r
+						});
+					break;
+				case "t2":
+					cells[eval(parameters[selectedImage].images[node].arrayoffset+i)] = paper.path('M '+(x*cellw+(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+(y*cellh+cellg/2+gridoy+parameters[selectedImage].paperborder)+' L '+((x+1)*cellw-(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+(y*cellh+cellg/2+gridoy+parameters[selectedImage].paperborder)+' L '+((x+1)*cellw-(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+((y+1)*cellh-cellg/2+gridoy+parameters[selectedImage].paperborder)+' Z')
+						.attr({
+							fill: imageColour.replace('%',''),
+							stroke: "none",
+							transform: "r"+r
+						});
+					break;
+				case "t3":
+					cells[eval(parameters[selectedImage].images[node].arrayoffset+i)] = paper.path('M '+(x*cellw+(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+(y*cellh+cellg/2+gridoy+parameters[selectedImage].paperborder)+' L '+((x+1)*cellw-(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+(y*cellh+cellg/2+gridoy+parameters[selectedImage].paperborder)+' L '+(x*cellw+(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+((y+1)*cellh-cellg/2+gridoy+parameters[selectedImage].paperborder)+' Z')
+						.attr({
+							fill: imageColour.replace('%',''),
+							stroke: "none",
+							transform: "r"+r
+						});
+					break;
+				case "t4":
+					cells[eval(parameters[selectedImage].images[node].arrayoffset+i)] = paper.path('M '+((x+1)*cellw-(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+(y*cellh+cellg/2+gridoy+parameters[selectedImage].paperborder)+' L '+((x+1)*cellw-(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+((y+1)*cellh-cellg/2+gridoy+parameters[selectedImage].paperborder)+' L '+(x*cellw+(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+((y+1)*cellh-cellg/2+gridoy+parameters[selectedImage].paperborder)+' Z')
+						.attr({
+							fill: imageColour.replace('%',''),
+							stroke: "none",
+							transform: "r"+r
+						});
+					break;
+				case "c":
+					cells[eval(parameters[selectedImage].images[node].arrayoffset+i)] = paper.ellipse((x*cellw)+(cellw/2)+gridox+parameters[selectedImage].paperborder,(y*cellh)+(cellh/2)+gridoy+parameters[selectedImage].paperborder,(cellw-(cellg*aspectRatio))/2,(cellh-cellg)/2)
+						.attr({
+							fill: imageColour.replace('%',''),
+							stroke: "none",
+							transform: "r"+r
+						});
+					break;
+				case "l1":
+					cells[eval(parameters[selectedImage].images[node].arrayoffset+i)] = paper.path('M '+(x*cellw+cellw/2+gridox+parameters[selectedImage].paperborder)+' '+(y*cellh+cellg/2+gridoy+parameters[selectedImage].paperborder)+' L '+(x*cellw+cellw/2+gridox+parameters[selectedImage].paperborder)+' '+((y+1)*cellh-cellg/2+gridoy+parameters[selectedImage].paperborder)+' Z')
+						.attr({
+							stroke: imageColour.replace('%',''),
+							'stroke-width': strokew,
+							transform: "r"+r
+						});
+					break;
+				case "l2":
+					cells[eval(parameters[selectedImage].images[node].arrayoffset+i)] = paper.path('M '+(x*cellw+(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+(y*cellh+cellh/2+gridoy+parameters[selectedImage].paperborder)+' L '+((x+1)*cellw-(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+(y*cellh+cellh/2+gridoy+parameters[selectedImage].paperborder)+' Z')
+						.attr({
+							stroke: imageColour.replace('%',''),
+							'stroke-width': strokeh,
+							transform: "r"+r
+						});
+					break;
+				case "l3":
+					cells[eval(parameters[selectedImage].images[node].arrayoffset+i)] = paper.path('M '+(x*cellw+(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+(y*cellh+cellg/2+gridoy+parameters[selectedImage].paperborder)+' L '+((x+1)*cellw-(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+((y+1)*cellh-cellg/2+gridoy+parameters[selectedImage].paperborder)+' Z')
+						.attr({
+							stroke: imageColour.replace('%',''),
+							'stroke-width': (strokew+strokeh)/2,
+							transform: "r"+r
+						});
+					break;
+				case "l4":
+					cells[eval(parameters[selectedImage].images[node].arrayoffset+i)] = paper.path('M '+((x+1)*cellw-(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+(y*cellh+cellg/2+gridoy+parameters[selectedImage].paperborder)+' L '+(x*cellw+(cellg*aspectRatio)/2+gridox+parameters[selectedImage].paperborder)+' '+((y+1)*cellh-cellg/2+gridoy+parameters[selectedImage].paperborder)+' Z')
+						.attr({
+							stroke: imageColour.replace('%',''),
+							'stroke-width': (strokew+strokeh)/2,
+							transform: "r"+r
+						});
+					break;
+			}
+		}
+	}
+
+	function registernode(node) {
+		// Read/generate node_uuid
+		var cookie_node_uuid = getCookie(parameters[selectedImage].images[node].cookie+"_node_uuid");
+		if (validUUID(cookie_node_uuid)) {
+			parameters[selectedImage].images[node].node_uuid = cookie_node_uuid;
+		}
+		else {
+			parameters[selectedImage].images[node].node_uuid = generateUUID();
+		}
+		setCookie(parameters[selectedImage].images[node].cookie+"_node_uuid",parameters[selectedImage].images[node].node_uuid,3650);
+
+		$.ajax({
+			method: "POST",
+			url: "/api/v1/nodes",
+			data: {
+				node_uuid: parameters[selectedImage].images[node].node_uuid,
+				parent_node_uuid: parameters[selectedImage].images[node].parent_node_uuid,
+				name: parameters[selectedImage].images[node].name,
+				random: Math.floor(Math.random()*1000000000000)
+			},
+			success: function(data) {
+				if (debug) {
+					console.log(node+": Node registered with server "+parameters[selectedImage].images[node].node_uuid+" "+parameters[selectedImage].images[node].name);
+				}
+				if ((data.debug) && debug) {
+					console.log((data.debug));
+				}
+			},
+			error: function() {
+				if (debug) {
+					console.log(node+": Unable to register node with server "+parameters[selectedImage].images[node].node_uuid+" "+parameters[selectedImage].images[node].name);
+				}
+				if ((data.debug) && debug) {
+					console.log((data.debug));
+				}
+			}
+		});
+	}
+
+	window.addEventListener("load", function() {
+		// Create a colour for offline colour swapping between nodes
+		//offlineColour = getCookie("offlineColour");
+		//if (offlineColour == null) {
+			// Colour Palette
+			//offlineColour = getColour(parameters[selectedImage].images[0].palette);
+			//setCookie("offlineColour",offlineColour,3650);
+		//}
+
+		// Set starting parameters
+		imagename = "";
+		switch (parseInt(parameters[selectedImage].images.length)) {
+			case 4:
+				parameters[selectedImage].images[3].name = "Transformations "+parameters[selectedImage].images[3].rule+parameters[selectedImage].images[3].shape;
+				parameters[selectedImage].images[3].cookie = "t-"+selectedImage+'-3';
+				parameters[selectedImage].images[3].arrayoffset = gridsize*3;
+				if (debug) {
+					console.log(parameters[selectedImage].images[3].name);
+				}
+				imagename = "/"+parameters[selectedImage].images[3].rule+parameters[selectedImage].images[3].shape+parameters[selectedImage].images[3].order+parameters[selectedImage].images[3].orientation;
+			case 3:
+				parameters[selectedImage].images[2].name = "Transformations "+parameters[selectedImage].images[2].rule+parameters[selectedImage].images[2].shape;
+				parameters[selectedImage].images[2].cookie ="t-"+selectedImage+'-2'
+				parameters[selectedImage].images[2].arrayoffset = gridsize*2;
+				if (debug) {
+					console.log(parameters[selectedImage].images[2].name);
+				}
+				imagename = "/"+parameters[selectedImage].images[2].rule+parameters[selectedImage].images[2].shape+parameters[selectedImage].images[2].order+parameters[selectedImage].images[2].orientation+imagename;
+			case 2:
+				parameters[selectedImage].images[1].name = "Transformations "+parameters[selectedImage].images[1].rule+parameters[selectedImage].images[1].shape;
+				parameters[selectedImage].images[1].cookie = "t-"+selectedImage+'-1'
+				parameters[selectedImage].images[1].arrayoffset = gridsize;
+				if (debug) {
+					console.log(parameters[selectedImage].images[1].name);
+				}
+				imagename = "/"+parameters[selectedImage].images[1].rule+parameters[selectedImage].images[1].shape+parameters[selectedImage].images[1].order+parameters[selectedImage].images[1].orientation+imagename;
+			default:
+				parameters[selectedImage].images[0].name = "Transformations "+parameters[selectedImage].images[0].rule+parameters[selectedImage].images[0].shape;
+				parameters[selectedImage].images[0].cookie = "t-"+selectedImage+'-0'
+				parameters[selectedImage].images[0].arrayoffset = 0;
+				if (debug) {
+					console.log(parameters[selectedImage].images[0].name);
+				}
+				imagename = "/"+parameters[selectedImage].images[0].rule+parameters[selectedImage].images[0].shape+parameters[selectedImage].images[0].order+parameters[selectedImage].images[0].orientation+imagename;
+				break;
+		}
+		imagename = "t/"+rows+"/"+columns+imagename;
+		imagename += "/"+parameters[selectedImage].view;
+		imagename += " ("+parameters[selectedImage].year+")";
+		//document.title = imagename;
+
+		// Create the canvas
+		paper = Raphael(document.getElementById("canvas"),0,0,100,100);
+		drawcanvas();
+
+		// Draw the image(s) and start heartbeat
+		switch (parseInt(parameters[selectedImage].images.length)) {
+			case 4:
+				//registernode(3);
+				drawimage(3);
+				triggerheartbeat(3);
+			case 3:
+				//registernode(2);
+				drawimage(2);
+				triggerheartbeat(2);
+			case 2:
+				//registernode(1);
+				drawimage(1);
+				triggerheartbeat(1);
+			default:
+				//registernode(0);
+				drawimage(0);
+				triggerheartbeat(0);
+				break;
+		}
+	});
+
+	$(window).resize(function() {
+		// Re-create the canvas
+		drawcanvas();
+
+		// Draw the image(s)
+		switch (parseInt(parameters[selectedImage].images.length)) {
+			case 4:
+				drawimage(3);
+			case 3:
+				drawimage(2);
+			case 2:
+				drawimage(1);
+			default:
+				drawimage(0);
+				break;
+		}
+	});
+
+	document.addEventListener('keydown', function(e) {
+		switch (e.keyCode) {
+			case 76: // L
+				inputmode = "l";
+				inputbuffer = "";
+				break;
+			case 83: // S
+				inputmode = "s";
+				inputbuffer = "";
+				break;
+			case 72: // H
+				inputmode = "h";
+				inputbuffer = "";
+				break;
+			case 84: // T
+				inputmode = "t";
+				inputbuffer = "";
+				break;
+			case 188: // ,
+				switch (inputmode) {
+					case 'l': // Light 0 - 1023
+						console.log("l "+inputbuffer);
+						light = parseInt(inputbuffer);
+						break;
+					case 's': // Sound 0 - 1023
+						console.log("s "+inputbuffer);
+						sound = parseInt(inputbuffer);
+						break;
+					case 'h': // Humidity 0 - 100
+						console.log("h "+inputbuffer);
+						humidity = parseInt(inputbuffer);
+						break;
+					case 't': // Temperature 0 - 40
+						console.log("t "+inputbuffer);
+						temperature = parseInt(inputbuffer);
+						if (t < 0) {
+							t = 0;
+						}
+						if (t > 40) {
+							t = 40;
+						}
+						drawcircle(3,t);
+						break;
+				}
+				inputmode = "";
+				inputbuffer = "";
+				break;
+			case 48: // 0
+				inputbuffer = inputbuffer+'0';
+				break;
+			case 49: // 1
+				inputbuffer = inputbuffer+'1';
+				break;
+			case 50: // 2
+				inputbuffer = inputbuffer+'2';
+				break;
+			case 51: // 3
+				inputbuffer = inputbuffer+'3';
+				break;
+			case 52: // 4
+				inputbuffer = inputbuffer+'4';
+				break;
+			case 53: // 5
+				inputbuffer = inputbuffer+'5';
+				break;
+			case 54: // 6
+				inputbuffer = inputbuffer+'6';
+				break;
+			case 55: // 7
+				inputbuffer = inputbuffer+'7';
+				break;
+			case 56: // 8
+				inputbuffer = inputbuffer+'8';
+				break;
+			case 57: // 9
+				inputbuffer = inputbuffer+'9';
+				break;
+		}
+	});
+	</script>
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-178479274-2"></script>
+	<body>
+		<div id="canvas"></div>
+	</body>
+	<script>
+		window.dataLayer = window.dataLayer || [];
+		function gtag(){dataLayer.push(arguments);}
+		gtag('js', new Date());
+		gtag('config', 'UA-178479274-2');
+	</script>
+</head>
+<body>
+<div id="canvas"></div>
+</body>
+</html>

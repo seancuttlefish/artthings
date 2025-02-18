@@ -1,0 +1,220 @@
+<!--
+	15th November 2018
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+	Light Panel
+-->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="robots" content="noindex">
+	<title>LCB Controller</title>
+
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+	<script type="text/javascript" src="/js/mqttws31.min.js"></script>
+	<script type="text/javascript" src="/js/jquery.mobile-events.min.js"></script>
+	<script type="text/javascript" src="/js/chance.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="style.css">
+	<meta name="viewport" content="user-scalable=no, width=320">
+	<link rel="apple-touch-icon" href="touch-icon-iphone.png">
+	<script type="text/javascript">
+
+var SERVERHOST = "iot.artthings.io";
+var SERVERPORT = 8884;
+var useSSL = true;
+console.log(SERVERHOST + ":" + SERVERPORT);
+
+var instanceid = new Chance(Math.random).guid(); // A unique ID for this instance
+console.log("Instance ID: "+instanceid);
+
+componentid = "controller";
+console.log("Component ID: "+componentid); // The specific componentid 
+
+var version = "Open Systems Dashboard 0.2.1";
+console.log(version);
+
+// Cybernetic Ecology Message Parameters
+var state = {
+	'id': instanceid,
+	'ecosystem': 'cybecol',
+	'system': 'lcblights',
+	'component': componentid,
+	"packetsin": 0,
+	"packetsout": 0,
+	"ontime": Math.floor(new Date().getTime() / 1000),
+	"uptime": 0,
+	"status": "ok"
+}
+console.log(state.id);
+
+//////////
+// MQTT //
+//////////
+
+var mqttconnected = false;
+var reconnectTimeout = 10000;
+MQTTConnect();
+
+// MQTT Functions
+function MQTTConnect() {
+	console.log("Connecting..");
+	$('#information').text("Connecting..");
+	client = new Paho.MQTT.Client(SERVERHOST, SERVERPORT, "web_" + new Date().getTime());
+	client.onConnectionLost = onConnectionLost;
+	client.onMessageArrived = onMessageArrived;
+	client.connect({
+		useSSL: useSSL,
+		timeout: 10,
+		onSuccess: onSuccess,
+		onFailure: onFailure
+	});
+}
+
+function onSuccess() {
+	console.log("MQTT client connected to " + SERVERHOST + ":" + SERVERPORT);
+	mqttconnected = true;
+	$("#status").text("Connected");
+
+			// Subscribe to core topics
+			client.subscribe(state.ecosystem + "/env/all/hello");
+			client.subscribe(state.ecosystem + "/" + state.system + "/all/hello");
+			client.subscribe(state.ecosystem + "/" + state.system + "/" + state.id + "/hello");
+			client.subscribe(state.ecosystem + "/" + state.system + "/+/set");
+			client.subscribe(state.ecosystem + "/" + state.system + "/+/state");
+			client.subscribe(state.ecosystem + "/" + state.system + "/+/done");
+			// Send state
+			sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+		}
+
+function onFailure(responseObject) {
+	mqttconnected = false;
+	$("#status").text("Lost Connection");
+	console.log("MQTT Failure: " + responseObject.errorMessage);
+	setTimeout(MQTTConnect(), reconnectTimeout);
+}
+
+function onConnectionLost(responseObject) {
+	mqttconnected = false;
+	$("#status").text("Lost Connection");
+	console.log("MQTT Lost connection: " + responseObject.errorMessage);
+	setTimeout(MQTTConnect(), reconnectTimeout);
+}
+
+function onMessageArrived(message) {
+	// ecology/system/component/event
+	var topics = message.destinationName.split("/");
+	var ecology = topics[0];
+	var system = topics[1];
+	var component = topics[2];
+	var event = topics[3];
+
+	try {
+		var packet = JSON.parse(message.payloadString);
+		var sourceid = packet.sourceid;
+		var data = packet.data;
+	} catch (e) {
+		var sourceid = component;
+		var data = packet;
+	}
+
+	switch (event) {
+		case "hello":
+			state.uptime = Math.floor(new Date().getTime() / 1000) - state.ontime;
+			sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+			break;
+		case "set":
+			$(".all").css("background-color", "#f00");
+			break;
+		case "done":
+			$("#id" + component).css("background-color", "#ff0");
+			break;
+		case "state":
+			$("#id" + component).css("background-color", "#0f0");
+			break;
+	}
+	console.log("MQTT: received " + message.destinationName);
+	state.packetsin++;
+}
+
+function sendmqtt(topic, packet) {
+	var message = new Paho.MQTT.Message(JSON.stringify(packet));
+	message.destinationName = topic;
+	client.send(message);
+	console.log("MQTT Message Sent "+topic);
+	state.packetsout++;
+}
+
+function sendmessage(topic, data) {
+	sendmqtt(state.ecosystem + "/" + state.system + "/" + topic, data);
+}
+	</script>
+</head>
+
+<body>
+	<div id="body">
+		<h1 id="status">&nbsp;</h1>
+		<div class="buttonbar">
+			<p>
+				<button class="bluecheck" style="background-color: #00ff00;" onclick="sendmqtt('cybecol/lcblights/all/set','1,255,0,0,100,0');sendmqtt('cybecol/lcblights/all/set','8,0,255,0,50,10');sendmqtt('cybecol/lcblights/all/set','0,0,0,0,0,0');"></button>
+				<button style="background-color: #000000;" onclick=""></button>
+				<button style="background-color: #0000ff;" onclick="sendmqtt('cybecol/lcblights/all/set','4,0,255,0,50,0');sendmqtt('cybecol/lcblights/all/set','0,0,0,0,0,0');"></button>
+				<button style="background-color: #000000;" onclick=""></button>
+				<button class="bluecheck" style="background-color: #ff0000;" onclick="sendmqtt('cybecol/lcblights/all/set','1,0,0,255,100,0');sendmqtt('cybecol/lcblights/all/set','8,0,255,0,50,10');sendmqtt('cybecol/lcblights/all/set','0,0,0,0,0,0');"></button>
+			</p>
+			<p>
+				<button style="background-color: #000000;" onclick=""></button>
+				<button style="background-color: #000000;" onclick=""></button>
+				<button style="background-color: #000000;" onclick=""></button>
+				<button style="background-color: #000000;" onclick=""></button>
+				<button style="background-color: #000000;" onclick=""></button>
+			</p>
+			<p>
+				<button style="background-color: #00ff00;" onclick="sendmqtt('cybecol/lcblights/all/set','4,255,0,0,50,0');sendmqtt('cybecol/lcblights/all/set','0,0,0,0,0,0');"></button>
+				<button style="background-color: #000000;" onclick=""></button>
+				<button style="background-color: #ffffff;" onclick="sendmqtt('cybecol/lcblights/all/set','4,255,255,255,50,0');sendmqtt('cybecol/lcblights/all/set','0,0,0,0,0,0');"></button>
+				<button style="background-color: #000000;" onclick=""></button>
+				<button style="background-color: #ff0000;" onclick="sendmqtt('cybecol/lcblights/all/set','4,0,0,255,50,0');sendmqtt('cybecol/lcblights/all/set','0,0,0,0,0,0');"></button>
+			</p>
+			<p>
+				<button style="background-color: #000000;" onclick=""></button>
+				<button style="background-color: #000000;" onclick=""></button>
+				<button style="background-color: #000000;" onclick=""></button>
+				<button style="background-color: #000000;" onclick=""></button>
+				<button style="background-color: #000000;" onclick=""></button>
+			</p>
+			<p>
+				<button class="yellowcheck" style="background-color: #00ff00;" onclick="sendmqtt('cybecol/lcblights/all/set','1,255,0,0,100,0');sendmqtt('cybecol/lcblights/all/set','8,255,0,255,50,10');sendmqtt('cybecol/lcblights/all/set','0,0,0,0,0,0');"></button>
+				<button style="background-color: #000000;" onclick=""></button>
+				<button style="background-color: #ffff00;" onclick="sendmqtt('cybecol/lcblights/all/set','4,255,0,255,50,0');sendmqtt('cybecol/lcblights/all/set','0,0,0,0,0,0');"></button>
+				<button style="background-color: #000000;" onclick=""></button>
+				<button class="yellowcheck" style="background-color: #ff0000;" onclick="sendmqtt('cybecol/lcblights/all/set','1,0,0,255,100,0');sendmqtt('cybecol/lcblights/all/set','8,255,0,255,50,10');sendmqtt('cybecol/lcblights/all/set','0,0,0,0,0,0');"></button>
+			</p>
+		</div>
+		<div class="statusbar">
+			<div id="id01" title="01" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id02" title="02" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id03" title="03" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id04" title="04" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id05" title="05" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id06" title="06" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id07" title="07" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id08" title="08" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id09" title="09" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id10" title="10" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id11" title="11" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id12" title="12" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id13" title="13" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id14" title="14" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id15" title="15" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id16" title="16" class="all" style="background-color: #000000;" onclick=""></div><!--
+			<div id="id17" title="17" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id18" title="18" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id19" title="19" class="all" style="background-color: #000000;" onclick=""></div>
+			<div id="id20" title="20" class="all" style="background-color: #000000;" onclick=""></div>-->
+		</div>
+		<p class="infobar"><a href="http://interactdigitalarts.uk/lcblights" target="_new">About</a></p>
+</body>
+
+</html>

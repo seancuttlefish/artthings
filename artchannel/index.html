@@ -1,0 +1,271 @@
+<!--
+	13th October 2020
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+	artChannel - Sean Clark
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="robots" content="noindex" />
+	<title>artChannel 0.0.1</title>
+	<meta name="apple-mobile-web-app-title" content="artChannel">
+	<meta name="viewport" content="width=device-width,height=device-height,user-scalable=no,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0">
+	<script type="text/javascript" src="./js/jquery.min.js"></script>
+	<script type="text/javascript" src="./js/mqttws31.min.js"></script>
+	<script type="text/javascript" src="./js/artthings.js"></script>
+	<script type="text/javascript" src="./js/chance.min.js"></script></script>
+	<meta name="viewport" content="user-scalable=no, width=320" />
+	<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+	<style type="text/css">
+		body {
+			background-color: #000;
+			-webkit-user-select: none;
+			-webkit-touch-callout: none;
+			margin: 0;
+		}
+		h1 {
+			width: 100%;
+			position: fixed;
+			top: 0;
+			margin-top: 0;
+			padding: 10px 0;
+			font-size: 170%;
+			font-family: "Courier", monospace;
+			color: #000;
+			background-color: #fff;
+			text-align: center;
+		}
+		h2 {
+			width: 100%;
+			position: fixed;
+			bottom: 0;
+			margin-bottom: 0;
+			padding: 10px 0;
+			font-size: 120%;
+			font-family: "Courier", monospace;
+			color: #000;
+			background-color: #fff;
+			text-align: center;
+		}
+		h2 a {
+			color: #000;
+			text-decoration: none;
+		}
+		#topleft {
+			position: fixed;
+			top: 0;
+			left: 0;
+		}
+		#topright {
+			position: fixed;
+			top: 0;
+			right: 0;
+		}
+		#bottomleft {
+			position: fixed;
+			bottom: 0;
+			left: 0;
+		}
+		#bottomright {
+			position: fixed;
+			bottom: 0;
+			right: 0;
+		}
+		video {
+			width: 960px;
+			height: 540px;
+			border: 1px #000 solid;
+			cursor: none;
+		}
+		video::-internal-media-controls-overlay-cast-button {
+			display: none;
+		}
+	</style>
+  <script type="text/javascript">
+
+		function resizecanvas() {
+			var screenwidth = window.innerWidth;
+			var screenheight = window.innerHeight;
+			if (screenwidth > screenheight*1.777) {
+				var canvasw = screenheight*1.777;
+				var canvash = screenheight;
+				var left = (screenwidth-canvasw)/2;
+				var top = 0;
+			} else {
+				var canvasw = screenwidth;
+				var canvash = screenwidth/1.777;
+				var left = 0;
+				var top = (screenheight-canvash)/2;
+      }
+
+			if ((canvash < 0) || (canvasw < 0)) {
+ 				canvash = 0;
+				canvasw = 0;
+			}
+
+			console.log("ScreenSize: " + screenwidth + "x" + screenheight + " Canvas: " + canvasw + "x" + canvash);
+
+			$("#topleft").css({
+				"top": top,
+				"left": left
+			});
+			$("#topright").css({
+				"top": top,
+				"left": left+canvasw/2
+			});
+			$("#bottomleft").css({
+				"top": top+canvash/2,
+				"left": left
+			});
+			$("#bottomright").css({
+				"top": top+canvash/2,
+				"left": left+canvasw/2
+			});
+			$("video").css({
+				"width": canvasw/2,
+				"height": canvash/2
+			});
+
+			if (canvash >= (screenheight-200)) {
+				$("h1").hide();
+				$("h2").hide();
+			}
+			else {
+				$("h1").show();
+				$("h2").show();
+			}
+    }
+
+		$(window).resize(function() {
+			resizecanvas();
+		});
+
+		var videos = [
+			{"channel": "lda", "file": "anoushka1.mp4", "artist": "Anoushka Goodwin"},
+			{"channel": "lda", "file": "anoushka2.mp4", "artist": "Anoushka Goodwin"},
+			{"channel": "lda", "file": "anoushka3.mp4", "artist": "Anoushka Goodwin"},
+			{"channel": "lda", "file": "anoushka4.mp4", "artist": "Anoushka Goodwin"},
+			{"channel": "lda", "file": "anoushka5.mp4", "artist": "Anoushka Goodwin"},
+			{"channel": "lda", "file": "anoushka6.mp4", "artist": "Anoushka Goodwin"},
+			{"channel": "lda", "file": "anoushka7.mp4", "artist": "Anoushka Goodwin"},
+			{"channel": "lda", "file": "jm-haddenham.mp4", "artist": "Joe Moran"},
+			{"channel": "lda", "file": "pm-superformular.mp4", "artist": "Paul Mazzitelli"},
+			{"channel": "lda", "file": "pr-video1.mp4", "artist": "Paul Rudman"},
+			{"channel": "lda", "file": "pr-video2.mp4", "artist": "Paul Rudman"},
+			{"channel": "lda", "file": "pr-video3.mp4", "artist": "Paul Rudman"},
+			{"channel": "lda", "file": "sc-circles.mp4", "artist": "Sean Clark"},
+			{"channel": "lda", "file": "sc-rotate.mp4", "artist": "Sean Clark"},
+			{"channel": "lda", "file": "leonie1.mp4", "artist": "Leonie DuBarry-Gurr"},
+			{"channel": "lda", "file": "leonie2.mp4", "artist": "Leonie DuBarry-Gurr"},
+			{"channel": "lda", "file": "leonie3.mp4", "artist": "Leonie DuBarry-Gurr"},
+			{"channel": "lda", "file": "leonie4.mp4", "artist": "Leonie DuBarry-Gurr"},
+			{"channel": "lda", "file": "leonie5.mp4", "artist": "Leonie DuBarry-Gurr"},
+			{"channel": "lda", "file": "leonie6.mp4", "artist": "Leonie DuBarry-Gurr"},
+			{"channel": "lda", "file": "jas1.mp4", "artist": "S A B O T A G E"},
+			{"channel": "lda", "file": "jas2.mp4", "artist": "S A B O T A G E"},
+			{"channel": "lda", "file": "jas3.mp4", "artist": "S A B O T A G E"},
+			{"channel": "lda", "file": "jas4.mp4", "artist": "S A B O T A G E"},
+			{"channel": "lda", "file": "jas5.mp4", "artist": "S A B O T A G E"},
+			{"channel": "lda", "file": "jas6.mp4", "artist": "S A B O T A G E"}
+		];
+
+		var videoFile1 = videos[Math.floor(Math.random()*videos.length)].file;
+		var videoFile2 = videos[Math.floor(Math.random()*videos.length)].file;
+		var videoFile3 = videos[Math.floor(Math.random()*videos.length)].file;
+		var videoFile4 = videos[Math.floor(Math.random()*videos.length)].file;
+
+		function start() {
+
+			resizecanvas();
+
+			var myVideo1 = document.getElementById("video1");
+			console.log("1: "+videoFile1);
+			myVideo1.setAttribute("src", videoFile1);
+			myVideo1.load();
+			myVideo1.play();
+			var myVideo2 = document.getElementById("video2");
+			console.log("2: "+videoFile2);
+			myVideo2.setAttribute("src", videoFile2);
+			myVideo2.load();
+			myVideo2.play();
+			var myVideo3 = document.getElementById("video3");
+			console.log("3: "+videoFile3);
+			myVideo3.setAttribute("src", videoFile3);
+			myVideo3.load();
+			myVideo3.play();
+			var myVideo4 = document.getElementById("video4");
+			console.log("4: "+videoFile4);
+			myVideo4.setAttribute("src", videoFile4);
+			myVideo4.load();
+			myVideo4.play();
+
+			myVideo1.onended = function() {
+				videoFile1 = videos[Math.floor(Math.random()*videos.length)].file;
+				console.log("1: "+videoFile1);
+				myVideo1.setAttribute("src", videoFile1);
+				myVideo1.load();
+				myVideo1.play();
+			};
+			myVideo2.onended = function() {
+				videoFile2 = videos[Math.floor(Math.random()*videos.length)].file;
+				console.log("2: "+videoFile2);
+				myVideo2.setAttribute("src", videoFile2);
+				myVideo2.load();
+				myVideo2.play();
+			};
+			myVideo3.onended = function() {
+				videoFile3 = videos[Math.floor(Math.random()*videos.length)].file;
+				console.log("3: "+videoFile3);
+				myVideo3.setAttribute("src", videoFile3);
+				myVideo3.load();
+				myVideo3.play();
+			};
+			myVideo4.onended = function() {
+				videoFile4 = videos[Math.floor(Math.random()*videos.length)].file;
+				console.log("4: "+videoFile4);
+				myVideo4.setAttribute("src", videoFile4);
+				myVideo4.load();
+				myVideo4.play();
+			};
+		}
+	</script>
+</head>
+<body onload="start();">
+	<h1>artChannel 0.0.1</h1>
+  <div id="canvas">
+		<div id="topleft">
+			<video id="video1" playsinline muted autoplay>
+				<source preload="auto" src="" type="video/mp4">			
+			</video>
+		</div>
+		<div id="topright">
+			<video id="video2" playsinline muted autoplay>
+				<source preload="auto" src="" type="video/mp4">			
+			</video>
+		</div>
+		<div id="bottomleft">
+			<video id="video3" playsinline muted autoplay>
+				<source preload="auto" src="" type="video/mp4">			
+			</video>
+		</div>
+		<div id="bottomright">
+			<video id="video4" playsinline muted autoplay>
+				<source preload="auto" src="" type="video/mp4">			
+			</video>
+		</div>
+	</div>
+	<h2><a href="https://interactdigitalarts.uk/artchannel/">information</a></h2>
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-178479274-2"></script>
+<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+	gtag('config', 'UA-178479274-2');
+</script>
+</body>
+</html>

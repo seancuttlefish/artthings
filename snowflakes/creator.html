@@ -1,0 +1,132 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<title>Snowflake Creator</title>
+	<link rel="apple-touch-icon" sizes="114x114" href="./apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+	<meta name="msapplication-TileColor" content="#da532c">
+	<meta name="theme-color" content="#ffffff">
+	<meta name="apple-mobile-web-app-title" content="Snowflakes">
+	<meta name="viewport" content="width=360, user-scalable=no">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/phaser-ce/2.19.2/phaser.min.js"></script>
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+	<script type="text/javascript" src="/js/mqttws31.min.js"></script>
+	<script type="text/javascript" src="/js/chance.min.js"></script>
+	<script>
+		$(document).ready(function() {
+			$("#information").hide();
+			// Show/Hide Information
+			$(document).keypress(function(e) {
+					if (e.keyCode === 105) { // q
+						$("#information").toggle();
+					}
+			});
+		});
+
+		var latitude = 0;
+		var longitude = 0;
+
+		var watchID = navigator.geolocation.watchPosition(function(position) {
+			latitude = position.coords.latitude;
+			longitude = position.coords.longitude;
+		});
+
+		var instanceid = new Chance(Math.random).guid(); // A unique ID for this instance
+		console.log("Instance ID: "+instanceid);
+
+		componentid = "creator";
+		console.log("Component ID: "+componentid); // The specific componentid
+
+		// artThings
+		var SERVERHOST = "iot.artthings.io";
+		var SERVERPORT = 8884;
+		var useSSL = true;
+		console.log(SERVERHOST + ":" + SERVERPORT);
+
+		var state = {
+			'id': instanceid,
+			'ecosystem': 'cybecol',
+			'system': 'snowflakes',
+			'component': componentid,
+			'packetsin': 0,
+			'packetsout': 0,
+			'ontime': Math.floor(new Date().getTime() / 1000),
+			'uptime': 0,
+			'status': 'ok'
+		}
+
+		// Canvas/Screen Size
+		var screenwidth = window.innerWidth;
+		var screenheight = window.innerHeight;
+		var canvaswidth = screenwidth;
+		var canvasheight = screenheight;
+		console.log("Screen: "+screenwidth+"x"+screenheight);
+		console.log("Canvas: "+canvaswidth+"x"+canvasheight);
+
+		// Functions
+		function getParameterByName(name,url) {
+			if (!url) url = window.location.href;
+			name = name.replace(/[\[\]]/g, "\\$&");
+			var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+				results = regex.exec(url);
+			if (!results) return null;
+			if (!results[2]) return '';
+			return decodeURIComponent(results[2].replace(/\+/g, " "));
+		}
+
+		function getObjectProperty(obj,prop,defaultval) {
+			if (typeof obj[prop] === 'undefined') return defaultval;
+			return obj[prop];
+		}
+
+	</script>
+	<script type="text/javascript" src="creator.js"></script>
+	<style>
+		body {
+			font-family: sans-serif;
+			font-size: 16px;
+			color: #666;
+			margin: 0;
+			-webkit-user-select: none;
+		}
+		canvas {
+			position: fixed;
+		}
+		#information {
+			position: fixed;
+			bottom: 4px;
+			right: 4px;
+			z-index: 999;
+		}
+		p {
+			position: fixed;
+			top: 440px;
+			text-align: center;
+			font-size: 20px;
+			color: #000;
+			padding: 10px;
+		}
+	</style>
+</head>
+
+<body>
+	<div id="phaser"></div>
+	<div id="information"></div>
+	<!-- <p>If you have any problems drawing a snowflake then please reload this web page.</p> -->
+
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-178479274-2"></script>
+	<script>
+		window.dataLayer = window.dataLayer || [];
+		function gtag(){dataLayer.push(arguments);}
+		gtag('js', new Date());
+
+		gtag('config', 'UA-178479274-2');
+	</script>
+
+</body>
+
+</html>

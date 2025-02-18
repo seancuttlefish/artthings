@@ -1,0 +1,284 @@
+<!--
+	4th June 2019
+	Elements - Rotate
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="robots" content="noindex">
+	<title>Elements 23112019 - Rotate</title>
+	<link rel="apple-touch-icon" href="apple-touch-icon.png">
+	<link rel="icon" href="favicon.ico">
+	<meta name="apple-mobile-web-app-title" content="Elements">
+	<meta name="viewport" content="width=device-width, user-scalable=no">
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+	<script type="text/javascript" src="/js/raphael.min.js"></script>
+	<script type="text/javascript" src="/js/seedrandom/lib/alea.min.js"></script>
+	<script type="text/javascript" src="/js/tonejs/build/Tone.js"></script>
+	<style type="text/css">
+		body {
+			overscroll-behavior-y: contain;
+		}
+		body {
+			background-color: #fff;
+			-webkit-user-select: none;
+			-webkit-touch-callout: none;
+			/*cursor: none;*/
+		}
+		#palette, #left, #right {
+			position: fixed;
+		}
+	</style>
+</head>
+<body>
+	<div id="left"></div>
+	<div id="right"></div>
+	<script type="text/javascript">
+
+$(document).ready(function() {
+	setup();
+	redraw();
+});
+
+// Tone Synth
+var synth = new Tone.MonoSynth().toMaster()
+const scale = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+// Sort Functions
+function Hcompare(a, b) {
+	const colorA = a.h;
+	const colorB = b.h;
+
+	let comparison = 0;
+	if (colorA > colorB) {
+		comparison = 1;
+	}
+	else {
+		comparison = -1;
+	}
+	return comparison;
+}
+
+const totalCols = 64, totalRows = 64;
+let screenwidth, screenheight, canvaswidth = 320, canvasheight = 320;
+let leftcanvas = new Raphael(document.getElementById('left'),canvaswidth,canvasheight);
+let rightcanvas = new Raphael(document.getElementById('right'),canvaswidth,canvasheight);
+let leftcells = [];
+let rightcells = [];
+let palette = [];
+let left = [];
+let right = [];
+let selected = 0, selectedprev = 0;
+let i, j, x, y;
+let hslcolor, h, s, l;
+let leftborder;
+let rightborder;
+let imagewidth, imageheight;
+let mouseDown = false;
+
+// Setup
+function setup() {
+	console.log("Setup: "+totalCols+"x"+totalRows);
+	// Generate Palette
+	let unique = false;
+	for (y=0; y<totalRows; y++) {
+		for (x=0; x<totalCols; x++) {
+			let color = new Object();
+			color.index = (y*totalRows)+x;
+			color.x = x;
+			color.y = y;
+			unique = false;
+			while (!unique) {
+				color.h = random(36000)/100;
+				unique = true;
+				i = (y*totalRows)+x;
+				for (j=0; j<i; j++) {
+					if (palette[j].h == color.h) {
+						console.log("Duplicate H:"+color.h);
+						unique = false;
+					}
+				}
+			}
+			unique = false;
+			while (!unique) {
+				color.s = (random(100000))/1000;
+				unique = true;
+				i = (y*totalRows)+x;
+				for (j=0; j<i; j++) {
+					if (palette[j].s == color.s) {
+						console.log("Duplicate S:"+color.s);
+						unique = false;
+					}
+				}
+			}
+			unique = false;
+			while (!unique) {
+				color.l = (random(100000))/1000;
+				unique = true;
+				i = (y*totalRows)+x;
+				for (j=0; j<i; j++) {
+					if (palette[j].l == color.l) {
+						console.log("Duplicate L:"+color.l);
+						unique = false;
+					}
+				}
+			}
+			palette.push(color);
+			i++;
+		}
+	}
+
+	// Generate Images
+	for (y=0; y<8; y++) {
+		for (x=0; x<8; x++) {
+			leftcells.push(leftcanvas.rect(x,y,1,1).attr({
+				fill: 'hsl(0,0,100)',
+				stroke: "none"
+			}));
+			rightcells.push(rightcanvas.rect(x,y,1,1).attr({
+				fill: 'hsl(0,0,100)',
+				stroke: "none"
+			}));
+		}
+	}
+	getcolors(5,5);
+}
+
+var rng = new alea("23112019");
+function random(val) {
+	return Math.floor(rng()*val);
+}
+
+// Loop
+function loop() {
+}
+
+function getcolors(col,row) {
+	left = [];
+	right = [];
+	for (i=0; i<64; i++) {
+		if ((palette[col+(i*totalCols)].s > 50) &&
+			(palette[col+(i*totalCols)].l > 20) &&
+			(palette[col+(i*totalCols)].l < 70)) {
+			left.push(palette[col+(i*totalCols)]);
+		}
+		if ((palette[(row*totalRows)+i].s > 50) &&
+			(palette[(row*totalRows)+i].l > 20) &&
+			(palette[(row*totalRows)+i].l < 70)) {
+			right.push(palette[(row*totalRows)+i]);
+		}
+	}
+	left.sort(Hcompare);
+	right.sort(Hcompare);
+	console.log(left, right);
+}
+
+// Sort Functions
+function Hcompare(a, b) {
+	const colorA = a.h;
+	const colorB = b.h;
+
+	let comparison = 0;
+	if (colorA > colorB) {
+		comparison = 1;
+	}
+	else {
+		comparison = -1;
+	}
+	return comparison;
+}
+function Scompare(a, b) {
+	const colorA = a.s;
+	const colorB = b.s;
+
+	let comparison = 0;
+	if (colorA > colorB) {
+		comparison = 1;
+	}
+	else {
+		comparison = -1;
+	}
+	return comparison;
+}
+function Lcompare(a, b) {
+	const colorA = a.l;
+	const colorB = b.l;
+
+	let comparison = 0;
+	if (colorA > colorB) {
+		comparison = 1;
+	}
+	else {
+		comparison = -1;
+	}
+	return comparison;
+}
+
+// Redraw
+function redraw() {
+	screenwidth = window.innerWidth;
+	screenheight = window.innerHeight;
+	canvaswidth = screenwidth;
+	canvasheight = canvaswidth;
+	imagewidth = canvaswidth/2;
+	imageheight = imagewidth;
+
+	console.log("Redraw: "+screenwidth+"x"+screenheight+" "+Math.floor(canvaswidth)+"x"+Math.floor(canvasheight));
+	leftcanvas.setSize(imagewidth,imageheight);
+	rightcanvas.setSize(imagewidth,imageheight);
+
+	$("#left").css({top:border,left:border,width:imagewidth,height:imageheight});
+	$("#right").css({top:border,left:border+imagewidth,width:imagewidth,height:imageheight});
+
+	renderimages();
+}
+
+function renderimages() {
+	const xoffset = imagewidth/32;
+	const yoffset = imagewidth/32;
+	for (i=0; i<64; i++) {
+		if (left[i]) {
+			hslcolor = "hsl("+left[i].h+","+left[i].s+","+left[i].l+")";
+			leftcells[i].attr({
+				x: imagewidth/2,
+				y: imagewidth/2,
+				width: imagewidth/6,
+				height: imageheight/3,
+				fill: hslcolor,
+				transform: ''
+			});
+			leftcells[i].rotate(left[i].h,imagewidth/2-xoffset,imagewidth/2-yoffset);
+		}
+		if (right[i]) {
+			hslcolor = "hsl("+right[i].h+","+right[i].s+","+right[i].l+")";
+			rightcells[i].attr({
+				x: imagewidth/2,
+				y: imagewidth/2,
+				width: imagewidth/6,
+				height: imageheight/3,
+				fill: hslcolor,
+				transform: ''
+			});
+			rightcells[i].rotate(right[i].h,imagewidth/2-xoffset,imagewidth/2-yoffset);
+		}
+	}
+}
+
+$(window).resize(function() {
+	redraw();
+});
+
+	</script>
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-72749066-15"></script>
+	<script>
+		window.dataLayer = window.dataLayer || [];
+		function gtag(){dataLayer.push(arguments);}
+		gtag('js', new Date());
+		gtag('config', 'UA-72749066-15');
+	</script>
+</body>
+</html>

@@ -1,0 +1,163 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<title>Santa Puppets</title>
+	<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+	<meta name="msapplication-TileColor" content="#da532c">
+	<meta name="theme-color" content="#ffffff">
+	<meta name="apple-mobile-web-app-title" content="Santa Puppets">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<script type="text/javascript" src="/js/ml5.min.js"></script>
+	<script type="text/javascript" src="/js/p5.js"></script>
+	<script type="text/javascript" src="/js/p5.dom.js"></script>
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+	<script type="text/javascript" src="/js/mqttws31.min.js"></script>
+	<script type="text/javascript" src="/js/chance.min.js"></script>
+	<script type="text/javascript">
+		// artThings
+		var instanceid = new Chance(Math.random).guid(); // A unique ID for this instance
+		console.log("Instance ID: "+instanceid);
+
+		var componentid = getParameterByName('cid'); // transmitter, receiver
+		if (!componentid) {
+			componentid = "standalone"; // The generic componentid
+		}
+		console.log("Component ID: "+componentid); // The specific componentid
+
+		// artThings
+		var SERVERHOST = "iot.artthings.io";
+		var SERVERPORT = 8884;
+		var useSSL = true;
+		console.log(SERVERHOST + ":" + SERVERPORT);
+
+		var state = {
+			'id': instanceid,
+			'ecosystem': 'cybecol',
+			'system': 'santa',
+			'component': componentid,
+			'packetsin': 0,
+			'packetsout': 0,
+			'ontime': Math.floor(new Date().getTime() / 1000),
+			'uptime': 0,
+			'status': 'ok'
+		}
+
+		// Functions
+		function getParameterByName(name,url) {
+			if (!url) url = window.location.href;
+			name = name.replace(/[\[\]]/g, "\\$&");
+			var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+				results = regex.exec(url);
+			if (!results) return null;
+			if (!results[2]) return '';
+			return decodeURIComponent(results[2].replace(/\+/g, " "));
+		}
+
+		function getObjectProperty(obj,prop,defaultval) {
+			if (typeof obj[prop] === 'undefined') return defaultval;
+			return obj[prop];
+		}
+
+		// Resize Window
+		$(window).resize(function() {
+			screenwidth = window.innerWidth;
+			screenheight = window.innerHeight;
+			console.log("Screen: "+screenwidth+"x"+screenheight);
+			if (screenwidth/640 > screenheight/480) {
+				var zoom = screenheight/480;
+				var top = 0;
+				var left = (screenwidth-zoom*640)/2;
+			}
+			else {
+				var zoom = screenwidth/640;
+				var top = (screenheight-zoom*480)/2;
+				var left = 0;
+			}
+			console.log("Resize: "+zoom+" "+top+" "+left);
+			$("#defaultCanvas0").css("zoom", zoom);
+			$("#defaultCanvas0").css("top", top/zoom);
+			$("#defaultCanvas0").css("left", left/zoom);
+		});
+	</script>
+	<script type="text/javascript" src="sketch.js"></script>
+	<style>
+		body {
+			color: #000;
+			background-color: #666;
+			margin: 0;
+			cursor: none;
+			overflow: hidden;
+			background-image: url('./assets/background.png');
+			background-repeat: no-repeat;
+			background-attachment: fixed;
+			background-position: center center;
+			-webkit-user-select: none;
+			-webkit-touch-callout: none;
+		}
+		#header {
+			position: fixed;
+			width: 100%;
+			top: 0;
+			left: 0;
+		}
+		#sketch {
+			position: fixed;
+			top: 0;
+			left: 0;
+		}
+		#defaultCanvas0 {
+			position: fixed;
+		}
+		#footer {
+			position: fixed;
+			width: 100%;
+			bottom: 0;
+			left: 0;
+		}
+		#information {
+			position: fixed;
+			display: none;
+			bottom: 4px;
+			right: 4px;
+			color: #fff;
+			opacity: 0.7;
+			z-index: 999;
+		}
+		a img {
+			position: fixed;
+			right: 10px;
+			bottom: 10px;
+			padding: 10px;
+			opacity: 0.1;
+			cursor: default;
+			z-index: 999;
+			width: 50px;
+			height: 50px;
+		}
+		a:hover img {
+			opacity: 1;
+		}
+	</style>
+</head>
+<body>
+	<div id="header"></div>
+	<div id="sketch"></div>
+	<div id="footer"></div>
+	<div id="information"></div>
+	<a href="https://www.interactdigitalarts.uk/projects/xmas-interactives"><img src="assets/info.png" /></a>
+
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-178479274-2"></script>
+	<script>
+		window.dataLayer = window.dataLayer || [];
+		function gtag(){dataLayer.push(arguments);}
+		gtag('js', new Date());
+		gtag('config', 'UA-178479274-2');
+	</script>
+</body>
+
+</html>

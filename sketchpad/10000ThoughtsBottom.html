@@ -1,0 +1,692 @@
+<!--
+	11th November 2019
+	10,000 Thoughts Bottom
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="robots" content="noindex">
+	<title>10,000 Thoughts Bottom</title>
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+	<script type="text/javascript" src="/js/raphael.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="style.css" />
+	<meta name='viewport' content='user-scalable=yes, initial-scale=1.0, maximum-scale=1.0, width=device-width'>
+</head>
+<body>
+	<div id="standaloneviewer"></div>
+	<div id="matrixviewer"></div>
+	<div id="information"></div>
+
+	<script type="text/javascript">
+
+/***********/
+/* JS Code */
+/***********/
+
+var matrixx = 8;
+var matrixy = 8;
+var matrixcanvas = new Raphael(document.getElementById('matrixviewer'),matrixx*50,matrixy*50);
+var cells = [];
+
+function connectToLights() {
+	for (y=0; y<matrixy; y++) {
+		for (x=0; x<matrixx; x++) {
+			cells.push(matrixcanvas.ellipse(x*50+25,y*50+25,20,20).attr({
+				fill: "rgb(0,0,0)",
+				stroke: "none"
+			}));
+		}
+	}
+}
+
+function setLight(i, r, g, b) {
+	cells[i].attr({
+		fill: "rgb("+r+","+g+","+b+")",
+		stroke: "none"
+	});
+}
+
+function updateLights() {
+}
+
+function random(val) {
+	return Math.floor(Math.random()*val);
+}
+
+function floor(val) {
+	return Math.floor(val);
+}
+
+function updatestatus() {
+	info = "<div><span>"+frameDelays[currentFrameDelay]+" "+speedFactor+" "+overallBrightness+"</span></div>";
+	for (i=0; i<numSprites; i++) {
+		info += "<div><span>"+sprites[i][1]+"</span> ";
+		info += "<span>"+sprites[i][2]+"</span> ";
+		info += "<span>"+sprites[i][3]+"</span> ";
+		info += "<span>"+sprites[i][4]+"</span> ";
+		info += "<span>"+sprites[i][7]+"</span> ";
+		info += "<span>"+sprites[i][8]+"</span></div>";
+	}
+	$('#information').html(info);
+}
+
+function getParameterByName(name, url) {
+	if (!url) url = window.location.href;
+	name = name.replace(/[\[\]]/g, "\\$&");
+	var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+	results = regex.exec(url);
+	if (!results) return null;
+	if (!results[2]) return '';
+	return decodeURIComponent(results[2].replace(/\+/g, " "));
+}
+
+$(document).ready(function() {
+	$(document).keypress(function(e) {
+			if (e.keyCode === 109) {
+				$("#matrixviewer").toggle();
+			}
+	});
+	$(document).keypress(function(e) {
+		if (e.keyCode === 100) {
+			downloadSequence();
+		}
+	});
+});
+
+/************************
+* Segment Analysis Code *
+************************/
+
+var path;
+var pathdata;
+var pathcount = 0;
+var subpathcount = 0;
+var Xpos = 0;
+var Ypos = 0;
+var previousXpos = 0;
+var previousYpos = 0;
+
+var pencolour = "#f00";
+var penwidth = 5;
+var clear = false;
+
+var duration, length, angle, diff, deviation;
+var previousLength, previousAngle, totalLength;
+var startXpos, startYpos, startData, endData;
+var duration, startTime, endTime;
+var sketchpad = new Raphael(document.getElementById('standaloneviewer'),1,1);
+
+var numPaths = 0;
+var paths = [];
+
+var logFile;
+var fileid = getParameterByName('id');
+
+if (fileid) {
+	logFile = "http://art.systems/sketchpad/sketches/"+fileid+".log";
+	console.log(logFile);
+
+	$.getJSON(logFile, function(data) {
+		var dataLength = data.length;
+		console.log("Data Length: "+data.length);
+
+		for (var i=0; i<dataLength; i++) {
+			if (clear) {
+				$("svg path").remove();
+				clear = false;
+			}
+			var item = data[i].split(" ");
+			var time = item[0];
+			var type = item[1];
+			var data1 = item[2];
+			var data2 = item[3];
+
+			switch(type) {
+				case 'I': // iOS Flag
+					console.log("iOS: "+data1);
+					break;
+				case 'X': // Canvas Size
+					console.log("Size: "+data1+"x"+data2);
+					sketchpad.setSize(data1,data2);
+					$('#sketchpad').css("width", data1);
+					$('#sketchpad').css("height", data2);
+					break;
+				case 'S': // Start Path
+					startData = i;
+					duration = time - endTime;
+					if (endTime) {
+						logpaths(0,duration,0,0,0);
+					}
+					startTime = time;
+					Xpos = data1;
+					Ypos = data2;
+
+					totalLength = 0;
+					previousLength = 0;
+					previousAngle = 0;
+
+					pathdata = "M"+Xpos+","+(Ypos-52);
+					path = sketchpad.path(pathdata);
+					path.attr("stroke-width", penwidth);
+					path.attr("stroke", pencolour);
+					path.attr("stroke-linecap", "round");
+					path.attr("stroke-linejoin", "round");
+
+					startXpos = Xpos;
+					startYpos = Ypos;
+					previousXpos = Xpos;
+					previousYpos = Ypos;	
+
+					pathcount++;
+					break;
+				case 'D': // Draw subpath
+					Xpos = data1;
+					Ypos = data2;
+
+					var Xdiff = Xpos - previousXpos;
+					var Ydiff = Ypos - previousYpos;
+					length = Math.sqrt(Math.pow(Xdiff,2)+Math.pow(Ydiff,2));
+					if (length) {
+						if (Xdiff > 0) {
+							angle = 90+(Math.asin(Ydiff/length)*180/Math.PI);
+						}
+						else {
+							angle = 270-(Math.asin(Ydiff/length)*180/Math.PI);
+						}
+						if ((previousXpos == startXpos) && (previousYpos == startYpos)) {
+							diff = 0;
+						}
+						else {
+							diff = angle-previousAngle;
+						}
+						if (Math.abs(diff) > 20) {
+							pencolour = "#faa";
+						}
+						else {
+							pencolour = "#ddd";
+						}
+
+						totalLength += length;
+						previousLength = length;
+						previousAngle = angle;
+
+						pathdata = "M"+previousXpos+","+(previousYpos-52);
+						path = sketchpad.path(pathdata);
+						path.attr("path", pathdata);
+						path.attr("stroke-width", penwidth);
+						path.attr("stroke", pencolour);
+						path.attr("stroke-linecap", "round");
+						path.attr("stroke-linejoin", "round");
+						pathdata += "L"+Xpos+","+(Ypos-52);
+						path.attr("path", pathdata);
+
+						previousXpos = Xpos;
+						previousYpos = Ypos;
+					}
+
+					subpathcount++;
+					break;
+				case 'E': // End Path
+					endData = i;
+					endTime = time;
+					duration = endTime - startTime;
+					Xpos = data1;
+					Ypos = data2;
+
+					var Xdiff = Xpos - previousXpos;
+					var Ydiff = Ypos - previousYpos;
+					length = Math.sqrt(Math.pow(Xdiff,2)+Math.pow(Ydiff,2));
+					totalLength += length;
+
+					pathdata = "M"+previousXpos+","+(previousYpos-52);
+					path = sketchpad.path(pathdata);
+					path.attr("path", pathdata);
+					path.attr("stroke-width", penwidth);
+					path.attr("stroke", pencolour);
+					path.attr("stroke-linecap", "round");
+					path.attr("stroke-linejoin", "round");
+					pathdata += "L"+Xpos+","+(Ypos-52);
+					path.attr("path", pathdata);
+
+					// Overall Path
+					var Xdiff = Xpos - startXpos;
+					var Ydiff = Ypos - startYpos;
+					length = Math.sqrt(Math.pow(Xdiff,2)+Math.pow(Ydiff,2));
+					if (Xdiff > 0) {
+						angle = 90+(Math.asin(Ydiff/length)*180/Math.PI);
+					}
+					else {
+						angle = 270-(Math.asin(Ydiff/length)*180/Math.PI);
+					}
+					deviation = Math.abs(Math.floor((length-totalLength)/length*100));
+					if (length < 5) { // Dot
+							pathdata = "M"+startXpos+","+(startYpos-52);
+							path = sketchpad.path(pathdata);
+							path.attr("stroke-width", 5);
+							path.attr("stroke", "#0f0");
+							path.attr("stroke-linecap", "round");
+							path.attr("stroke-linejoin", "round");
+							pathdata += "L"+Xpos+","+(Ypos-52);
+							path.attr("path", pathdata);
+							logpaths(1,duration,1,0,0);
+					}
+					else {
+						if (deviation > 10) { // Curve
+							var subpathXpos, subpathYpos, subpathStartXpos,subpathStartYpos, subpathPreviousXpos, subpathPreviousYpos;
+							var subpathTotalLength, subpathLength, subpathAngle, subpathDiff, subpathDeviation, subpathPreviousLength, subpathPreviousAngle;
+							var subpathTime, subpathStartTime, subpathEndTime, subpathDuration
+							var startPath = false, endPath = false;
+
+							for (var j=startData; j<=endData; j++) {
+								var item = data[j].split(" ");
+								subpathTime = item[0];
+								subpathXpos = item[2];
+								subpathYpos = item[3];
+
+								if (j == endData || endPath) {
+									subpathEndTime = subpathTime;
+									subpathDuration = subpathEndTime - subpathStartTime;
+
+									var Xdiff = subpathXpos - subpathPreviousXpos;
+									var Ydiff = subpathYpos - subpathPreviousYpos;
+									subpathLength = Math.sqrt(Math.pow(subpathXpos-subpathPreviousXpos,2)+Math.pow(subpathYpos-subpathPreviousYpos,2));
+									subpathTotalLength += subpathLength;
+
+									// Overall subpath
+									var Xdiff = subpathXpos - subpathStartXpos;
+									var Ydiff = subpathYpos - subpathStartYpos;
+									subpathLength = Math.sqrt(Math.pow(Xdiff,2)+Math.pow(Ydiff,2));
+									if (Xdiff > 0) {
+										subpathAngle = 90+(Math.asin(Ydiff/subpathLength)*180/Math.PI);
+									}
+									else {
+										subpathAngle = 270+(Math.asin(Ydiff/subpathLength)*180/Math.PI);
+									}
+									subpathDeviation = Math.abs(Math.floor((subpathLength-subpathTotalLength)/subpathLength*100));
+
+									endPath = false;
+									startPath = true;
+
+									if (subpathTotalLength > 20) {
+										if (subpathDeviation > 10) { // Curve
+											pathdata = "M"+subpathStartXpos+","+(subpathStartYpos-52);
+											path = sketchpad.path(pathdata);
+											path.attr("stroke-width", 5);
+											path.attr("stroke", "#00f");
+											path.attr("stroke-linecap", "round");
+											path.attr("stroke-linejoin", "round");
+											pathdata += "L"+subpathXpos+","+(subpathYpos-52);
+											path.attr("path", pathdata);
+											logpaths(3,subpathDuration,Math.floor(subpathTotalLength),Math.floor(subpathDeviation),Math.floor(subpathAngle));
+										}
+										else { // Line
+											pathdata = "M"+subpathStartXpos+","+(subpathStartYpos-52);
+											path = sketchpad.path(pathdata);
+											path.attr("stroke-width", 5);
+											path.attr("stroke", "#000");
+											path.attr("stroke-linecap", "round");
+											path.attr("stroke-linejoin", "round");
+											pathdata += "L"+subpathXpos+","+(subpathYpos-52);
+											path.attr("path", pathdata);
+											logpaths(2,subpathDuration,Math.floor(subpathTotalLength),Math.floor(subpathDeviation),Math.floor(subpathAngle));
+										}
+									}
+								}
+								else if (j == startData || startPath) {
+									subpathStartTime = subpathTime;
+
+									subpathLength = 0;
+									subpathTotalLength = 0;
+									subpathAngle = 0;
+
+									subpathStartXpos = subpathXpos;
+									subpathStartYpos = subpathYpos;
+
+									startPath = false;
+								}
+								else {
+									var Xdiff = subpathXpos - subpathPreviousXpos;
+									var Ydiff = subpathYpos - subpathPreviousYpos;
+									subpathLength = Math.sqrt(Math.pow(Xdiff,2)+Math.pow(Ydiff,2));
+									if (subpathLength) {
+										if (Xdiff > 0) {
+											subpathAngle = 90+(Math.asin(Ydiff/subpathLength)*180/Math.PI);
+										}
+										else {
+											subpathAngle = 270+(Math.asin(Ydiff/subpathLength)*180/Math.PI);
+										}
+										if ((subpathPreviousXpos == subpathStartXpos) && (subpathPreviousYpos == subpathStartYpos)) {
+											subpathDiff = 0;
+										}
+										else {
+											subpathDiff = subpathAngle - subpathPreviousAngle;
+										}
+										if (Math.abs(subpathDiff) > 20) {
+											if (subpathTotalLength/totalLength > 0.05) { // Any subpath must be > 5% of the total path
+												endPath = true;
+											}
+										}
+										subpathTotalLength += subpathLength;
+									}
+								}
+
+								subpathPreviousLength = subpathLength;
+								subpathPreviousAngle = subpathAngle;
+
+								subpathPreviousXpos = subpathXpos;
+								subpathPreviousYpos = subpathYpos;
+							}
+						}
+						else { // Line
+							pathdata = "M"+startXpos+","+(startYpos-52);
+							path = sketchpad.path(pathdata);
+							path.attr("stroke-width", 5);
+							path.attr("stroke", "#000");
+							path.attr("stroke-linecap", "round");
+							path.attr("stroke-linejoin", "round");
+							pathdata += "L"+Xpos+","+(Ypos-52);
+							path.attr("path", pathdata);
+							logpaths(2,duration,Math.floor(totalLength),Math.floor(deviation),Math.floor(angle));
+						}
+					}
+					break;
+				case 'C': // Pen Colour
+					console.log("Pen Colour: "+data1);
+					pencolour = data1;
+					break;
+				case 'P': // Pen Width
+					console.log("Pen Width: "+data1);
+					penwidth = data1;
+					break;
+				case 'U': // Undo
+					console.log("Undo Path");
+					$("svg path:last-child").remove();
+					break;
+			}
+		}
+		numPaths = paths.length;
+		setup();
+		loop();
+	});
+}
+
+function logpaths(type, duration, length, deviation, angle) {
+	var startx = 0, starty = 0, endx = 0, endy = 0;
+	paths.push({
+		type: type,
+		duration: duration,
+		length: length,
+		deviation: deviation,
+		angle: angle,
+		startx: startx,
+		starty: starty,
+		endx: endx,
+		endy: endy
+	});
+	console.log("{"+type+","+duration+","+length+","+deviation+","+angle+","+startx+","+starty,endx+","+endy+"},");
+}
+
+function downloadSequence() {
+	console.log("Download Sequence");
+}
+
+/**********************
+* Cross Platform Code *
+***********************/
+
+var numPresets = 1;
+var numSprites = 3;
+var numLights = 64;
+
+var pathCounter = 0;
+
+var delayGap = 400;
+var delayDot = 100;
+var delayLine = 200;
+var delayCurve = 300;
+
+var i, j, x, y;
+var r, g, b;
+var rinc, ginc, binc;
+var lightDuration, newLight, newPath;
+
+var sprites = [];
+// status, current_position, sprite_size, light_inc, starting_rinc, starting_ginc, starting_binc, active_lights
+var lights = [];
+// status, r, g, b, rinc, ginc, binc, sprite
+
+// Settings
+var currentPreset = 0;
+var presets = [
+  // starting_sprite_size, sprite_brightness_percentage
+  [4, 40]
+];
+var currentFrameDelay = 2;
+var frameDelays = [100, 100, 100, 100, 50, 50, 50, 50, 20, 20];
+var frameDelayChance = 100; // Chance of frameDelay change per frame
+var spriteChance = 100; // Chance of sprite change per frame
+		
+var speedFactor = 10;
+var overallBrightnessMin = 100;
+var overallBrightnessMax = 300;
+var overallBrightness = 0;
+var overallBrightnessInc = 1;
+
+function setup() {
+  // Publish Status of System
+	version = "10,000 Thoughts Bottom 0.3";
+	$('#information').text(version);
+	console.log(version);
+
+  // Connect to Lights
+  connectToLights();
+
+	// Setup Sprites
+	for (i=0; i<numSprites; i++) {
+		sprites[i] = []; // JS Only
+    sprites[i][0] = true; // status
+    sprites[i][1] = random(numLights); // current_position
+    sprites[i][2] = 3;   // starting_sprite_size
+    sprites[i][3] = 1;   // light_inc
+    sprites[i][4] = 10;  // starting_rinc
+    sprites[i][5] = 10;  // starting_ginc
+    sprites[i][6] = 10;  // starting_binc
+    sprites[i][7] = 100; // brightness_percentage
+    sprites[i][8] = 0;   // active_lights
+	}
+
+  // Setup Lights
+	for (i=0; i<numLights; i++) {
+		lights[i] = []; // JS Only
+		lights[i][0] = false; // status
+		lights[i][1] = 0; // current_r
+		lights[i][2] = 0; // current_g
+		lights[i][3] = 0; // current_b
+		lights[i][4] = 1; // current_rinc
+		lights[i][5] = 1; // current_ginc
+		lights[i][6] = 1; // current_binc
+		lights[i][7] = 0; // brightness_percentage
+		lights[i][8] = 0; // current_sprite
+	}
+  updateLights();
+
+	// Activate Sprites
+  for (i=0; i<numSprites; i++) {
+    lights[sprites[i][1]][0] = true;          // status
+    lights[sprites[i][1]][4] = sprites[i][4]; // current_rinc
+    lights[sprites[i][1]][7] = sprites[i][7]; // brightness_percentage
+    lights[sprites[i][1]][8] = i;             // current_sprite
+  }
+}
+	
+function loop() {
+	setTimeout(function() {
+			// Activate Lights
+			for (i=0; i<numSprites; i++) {
+				if (sprites[i][8] <= sprites[i][2]) { // Add light to sprite
+					if (sprites[i][3]) { // Sprite not paused (inc is not 0)
+						newLight = sprites[i][1];
+						sprites[i][1] += sprites[i][3];
+						if (sprites[i][1] > numLights-sprites[i][2]) { // Top bounce
+							sprites[i][1] = numLights-sprites[i][2];
+							sprites[i][3] = -1;
+							sprites[i][4] = 4;
+						}
+						if (sprites[i][1] < 0) { // Bottom bounce
+							sprites[i][1] = 0;
+							sprites[i][3] = 1;
+							sprites[i][4] = 4;
+						}
+						if (random(spriteChance) == 0) { // Sprite unpause chance
+							sprites[i][3] = 0;
+							sprites[i][4] = 1;
+						}
+					}
+					else { // Sprite paused
+						newLight = sprites[i][1]+random(sprites[i][2]);
+						if (spriteChance && random(spriteChance) == 0) { // Chance of sprite unpausing
+							if (random(2) == 0) {
+								sprites[i][3] = 1;
+								sprites[i][4] = 8;
+							}
+							else {
+								sprites[i][3] = -1;
+								sprites[i][4] = 8;
+							}
+						}
+					}
+
+					if (!lights[newLight][1]) { // Is light in use? r!=0
+						// Get a new path
+						newPath = pathCounter;	
+						pathCounter++;
+						if (pathCounter >= numPaths) {
+							pathCounter = 0;
+						}
+	
+						lights[newLight][0] = true; // status
+						lights[newLight][1] = 0; // r
+						lights[newLight][2] = 0; // g
+						lights[newLight][3] = 0; // b
+	
+						lightDuration = paths[newPath].duration; // Not Arduino
+						if (lightDuration > 1000) {
+							lightDuration = 1000;
+						}
+						rinc = 1000-lightDuration;
+						ginc = 1000-lightDuration;
+						binc = 1000-lightDuration;
+
+						switch (paths[newPath].type) { // Not Arduino
+							case 0: // Gap
+								lights[newLight][4] = floor(rinc/delayGap+1)*sprites[i][4];
+								lights[newLight][5] = floor(ginc/delayGap+1)*sprites[i][5];
+								lights[newLight][6] = floor(binc/delayGap+1)*sprites[i][6];
+								break;
+							case 1: // Dot
+								lights[newLight][4] = floor(rinc/delayDot+1)*sprites[i][4];
+								lights[newLight][5] = floor(ginc/delayDot+1)*sprites[i][5];
+								lights[newLight][6] = floor(binc/delayDot+1)*sprites[i][6];
+								break;
+							case 2: // Line
+								lights[newLight][4] = floor(rinc/delayLine+1)*sprites[i][4];
+								lights[newLight][5] = floor(ginc/delayLine+1)*sprites[i][5];
+								lights[newLight][6] = floor(binc/delayLine+1)*sprites[i][6];
+								break;
+							case 3: // Curve
+								lights[newLight][4] = floor(rinc/delayCurve)*sprites[i][4];
+								lights[newLight][5] = floor(ginc/delayCurve)*sprites[i][5];
+								lights[newLight][6] = floor(binc/delayCurve)*sprites[i][6];
+								break;
+						}
+
+						lights[newLight][7] = sprites[i][7]; // brightness_percentage
+						lights[newLight][8] = i; // currnet_sprite
+					}
+				}
+			}
+
+		// frameDelay Randomiser
+		if (frameDelayChance && random(frameDelayChance) == 0) {
+			currentFrameDelay = random(10);
+		}
+
+		// Process Frame
+		for (i=0; i<numLights; i++) {
+			sprites[lights[i][8]][8] = 0; // Zero the sprite light counts
+			if (lights[i][0]) { // On/Off?
+				lights[i][1] += lights[i][4];
+				lights[i][2] += lights[i][5];
+				lights[i][3] += lights[i][6];
+				if (lights[i][1] >= 255) {
+					lights[i][1] = 255;
+					lights[i][4] = lights[i][4]*-1;
+				}
+				if (lights[i][1] <= 0) {
+					lights[i][1] = 0;
+					lights[i][4] = 0;
+				}
+				if (lights[i][2] >= 255) {
+					lights[i][2] = 255;
+					lights[i][5] = lights[i][5]*-1;
+				}
+				if (lights[i][2] <= 0) {
+					lights[i][2] = 0;
+					lights[i][5] = 0;
+				}
+				if (lights[i][3] >= 255) {
+					lights[i][3] = 255;
+					lights[i][6] = lights[i][6]*-1;
+				}
+				if (lights[i][3] <= 0) {
+					lights[i][3] = 0;
+					lights[i][6] = 0;
+				}
+				if ((lights[i][4] == 0) && (lights[i][5] == 0) && (lights[i][6] == 0)) {
+					lights[i][0] = false;
+				}
+			}
+		}
+
+		// Overall Brightness Control
+		if (overallBrightnessMax) {
+			overallBrightness += overallBrightnessInc;
+			if (overallBrightness >= overallBrightnessMax) {
+				overallBrightness = overallBrightnessMax;
+				overallBrightnessInc *= -1;
+			}
+			if (overallBrightness <= overallBrightnessMin) {
+				overallBrightness = overallBrightnessMin;
+				overallBrightnessInc *= -1;
+			}
+		}
+
+		// Render Frame
+		for (i=0; i<numLights; i++) {
+			if (lights[i][0]) { //On/Off?
+				r = floor((lights[i][1]*lights[i][7])/100);
+				if (overallBrightnessMax) {
+					r = floor((r*overallBrightness)/overallBrightnessMax); // Calculate as a double or float?
+				}
+				sprites[lights[i][8]][8]++; // Count the sprite lights
+				setLight(i, r, r, r);
+			}
+			else {
+				setLight(i, 0, 0, 0);
+			}
+		}
+
+		// Status
+		updatestatus();
+
+		updateLights();
+		loop();
+	}, frameDelays[currentFrameDelay]/speedFactor);
+}
+
+	</script>
+</body>
+</html>

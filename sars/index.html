@@ -1,0 +1,198 @@
+<!--
+	15th November 2022
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+	Homeostasis
+-->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="robots" content="noindex">
+	<title>Homeostasis</title>
+
+	<script type="text/javascript" src="../js/jquery.min.js"></script>
+	<script type="text/javascript" src="../js/mqttws31.min.js"></script>
+	<script type="text/javascript" src="../js/jquery.mobile-events.min.js"></script>
+	<script type="text/javascript" src="../js/chance.min.js"></script>
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">	<link rel="apple-touch-icon" href="touch-icon-iphone.png">
+	<script type="text/javascript">
+
+var SERVERHOST = "iot.artthings.io";
+var SERVERPORT = 8884;
+var useSSL = true;
+console.log(SERVERHOST + ":" + SERVERPORT);
+
+var instanceid = new Chance(Math.random).guid(); // A unique ID for this instance
+console.log("Instance ID: "+instanceid);
+
+componentid = "controller";
+console.log("Component ID: "+componentid); // The specific componentid
+
+var version = "SARS 0.0.2";
+console.log(version);
+
+// Cybernetic Ecology Message Parameters
+var state = {
+	'id': instanceid,
+	'ecosystem': 'cybecol',
+	'system': 'sars',
+	'component': componentid,
+	"packetsin": 0,
+	"packetsout": 0,
+	"ontime": Math.floor(new Date().getTime() / 1000),
+	"uptime": 0,
+	"status": "ok"
+}
+console.log(state.id);
+
+//////////
+// MQTT //
+//////////
+
+var mqttconnected = false;
+var reconnectTimeout = 10000;
+MQTTConnect();
+
+// MQTT Functions
+function MQTTConnect() {
+	console.log("Connecting..");
+	$('#information').text("Connecting..");
+	client = new Paho.MQTT.Client(SERVERHOST, SERVERPORT, "web_" + new Date().getTime());
+	client.onConnectionLost = onConnectionLost;
+	client.onMessageArrived = onMessageArrived;
+	client.connect({
+		useSSL: useSSL,
+		timeout: 10,
+		onSuccess: onSuccess,
+		onFailure: onFailure
+	});
+}
+
+function onSuccess() {
+	console.log("MQTT client connected to " + SERVERHOST + ":" + SERVERPORT);
+	mqttconnected = true;
+	$("#status").text("Connected");
+	// Subscribe to core topics
+	client.subscribe(state.ecosystem + "/env/all/hello");
+	client.subscribe(state.ecosystem + "/" + state.system + "/all/hello");
+	client.subscribe(state.ecosystem + "/" + state.system + "/" + state.id + "/hello");
+	// Send state
+	sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+}
+
+function onFailure(responseObject) {
+	mqttconnected = false;
+	$("#status").text("Lost Connection");
+	console.log("MQTT Failure: " + responseObject.errorMessage);
+	setTimeout(MQTTConnect(), reconnectTimeout);
+}
+
+function onConnectionLost(responseObject) {
+	mqttconnected = false;
+	$("#status").text("Lost Connection");
+	console.log("MQTT Lost connection: " + responseObject.errorMessage);
+	setTimeout(MQTTConnect(), reconnectTimeout);
+}
+
+function onMessageArrived(message) {
+	// ecology/system/component/event
+	var topics = message.destinationName.split("/");
+	var ecology = topics[0];
+	var system = topics[1];
+	var component = topics[2];
+	var event = topics[3];
+
+	try {
+		var packet = JSON.parse(message.payloadString);
+		var sourceid = packet.sourceid;
+		var data = packet.data;
+	} catch (e) {
+		var sourceid = component;
+		var data = packet;
+	}
+
+	switch (event) {
+		case "hello":
+			state.uptime = Math.floor(new Date().getTime() / 1000) - state.ontime;
+			sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+			break;
+	}
+	console.log("MQTT: received " + message.destinationName);
+	state.packetsin++;
+}
+
+function sendmqtt(topic, packet) {
+	var message = new Paho.MQTT.Message(JSON.stringify(packet));
+	message.destinationName = topic;
+	client.send(message);
+	console.log("MQTT Message Sent "+topic);
+	state.packetsout++;
+}
+
+function sendmessage(topic, data) {
+	sendmqtt(state.ecosystem + "/" + state.system + "/" + topic, data);
+}
+	</script>
+	<style type="text/css">
+		body {
+			background-color: #000;
+			color: #fff;
+			font-family: sans-serif;
+			-webkit-user-select: none;
+			-webkit-touch-callout: none;
+			margin: 4px;
+			padding: 0;
+		}
+		
+		.top, .right,.left, .bottom {
+			width: 100%;
+		}
+		button {
+			font-size: 130%;
+			width: 8%;
+			height: 50px;
+			border: 0;
+			padding: 0;
+			margin: 0 1%;
+		}
+		b {
+			font-size: 130%;
+		}
+	</style>
+</head>
+
+<body>
+	<div id="body">
+		<h1>Homeostasis</h1>
+		<p><b>Top</b></p>
+		<p class="top">
+			<button class="b0" onclick="sendmqtt('cybecol/sars/matrix/set1','0');">0</button><button class="b1" onclick="sendmqtt('cybecol/sars/matrix/set1','1');">1</button><button class="b2" onclick="sendmqtt('cybecol/sars/matrix/set1','2');">2</button><button class="b3" onclick="sendmqtt('cybecol/sars/matrix/set1','3');">3</button><button class="b4" onclick="sendmqtt('cybecol/sars/matrix/set1','4');">4</button><button class="b5" onclick="sendmqtt('cybecol/sars/matrix/set1','5');">5</button><button class="b6" onclick="sendmqtt('cybecol/sars/matrix/set1','6');">6</button><button class="b7" onclick="sendmqtt('cybecol/sars/matrix/set1','7');">7</button><button class="b8" onclick="sendmqtt('cybecol/sars/matrix/set1','8');">8</button><button class="b9" onclick="sendmqtt('cybecol/sars/matrix/set1','9');">9</button>
+		</p>
+		<p><b>Right</b></p>
+		<p class="right">
+			<button class="b0" onclick="sendmqtt('cybecol/sars/matrix/set0','0');">0</button><button class="b1" onclick="sendmqtt('cybecol/sars/matrix/set0','1');">1</button><button class="b2" onclick="sendmqtt('cybecol/sars/matrix/set0','2');">2</button><button class="b3" onclick="sendmqtt('cybecol/sars/matrix/set0','3');">3</button><button class="b4" onclick="sendmqtt('cybecol/sars/matrix/set0','4');">4</button><button class="b5" onclick="sendmqtt('cybecol/sars/matrix/set0','5');">5</button><button class="b6" onclick="sendmqtt('cybecol/sars/matrix/set0','6');">6</button><button class="b7" onclick="sendmqtt('cybecol/sars/matrix/set0','7');">7</button><button class="b8" onclick="sendmqtt('cybecol/sars/matrix/set0','8');">8</button><button class="b9" onclick="sendmqtt('cybecol/sars/matrix/set0','9');">9</button>
+		</p>
+		<p><b>Bottom</b></p>
+		<p class="bottom">
+			<button class="b0" onclick="sendmqtt('cybecol/sars/matrix/set3','0');">0</button><button class="b1" onclick="sendmqtt('cybecol/sars/matrix/set3','1');">1</button><button class="b2" onclick="sendmqtt('cybecol/sars/matrix/set3','2');">2</button><button class="b3" onclick="sendmqtt('cybecol/sars/matrix/set3','3');">3</button><button class="b4" onclick="sendmqtt('cybecol/sars/matrix/set3','4');">4</button><button class="b5" onclick="sendmqtt('cybecol/sars/matrix/set3','5');">5</button><button class="b6" onclick="sendmqtt('cybecol/sars/matrix/set3','6');">6</button><button class="b7" onclick="sendmqtt('cybecol/sars/matrix/set3','7');">7</button><button class="b8" onclick="sendmqtt('cybecol/sars/matrix/set3','8');">8</button><button class="b9" onclick="sendmqtt('cybecol/sars/matrix/set3','9');">9</button>
+		</p>
+		<p><b>Left</b></p>
+		<p class="left">
+			<button class="b0" onclick="sendmqtt('cybecol/sars/matrix/set2','0');">0</button><button class="b1" onclick="sendmqtt('cybecol/sars/matrix/set2','1');">1</button><button class="b2" onclick="sendmqtt('cybecol/sars/matrix/set2','2');">2</button><button class="b3" onclick="sendmqtt('cybecol/sars/matrix/set2','3');">3</button><button class="b4" onclick="sendmqtt('cybecol/sars/matrix/set2','4');">4</button><button class="b5" onclick="sendmqtt('cybecol/sars/matrix/set2','5');">5</button><button class="b6" onclick="sendmqtt('cybecol/sars/matrix/set2','6');">6</button><button class="b7" onclick="sendmqtt('cybecol/sars/matrix/set2','7');">7</button><button class="b8" onclick="sendmqtt('cybecol/sars/matrix/set2','8');">8</button><button class="b9" onclick="sendmqtt('cybecol/sars/matrix/set2','9');">9</button>
+		</p>
+	</div>
+
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-178479274-2"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-178479274-2');
+</script>
+
+	</body>
+</html>

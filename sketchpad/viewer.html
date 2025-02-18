@@ -1,0 +1,193 @@
+<!--
+	6th September 2019
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+	Drawing Gesture Viewer
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="robots" content="noindex">
+	<title>Viewer</title>
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+	<script type="text/javascript" src="/js/raphael.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="style.css?12345" />
+	<style>
+		body {
+			cursor: none;
+		}
+	</style>
+	<meta name='viewport' content='user-scalable=yes, initial-scale=1.0, maximum-scale=1.0, width=device-width'>
+</head>
+<body>
+	<div id="standaloneviewer"></div>
+
+	<script type="text/javascript">
+	version = "Viewer 0.2";
+	console.log(version);
+
+	function getParameterByName(name, url) {
+		if (!url) url = window.location.href;
+		name = name.replace(/[\[\]]/g, "\\$&");
+		var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+			results = regex.exec(url);
+		if (!results) return null;
+		if (!results[2]) return '';
+		return decodeURIComponent(results[2].replace(/\+/g, " "));
+	}
+
+	var path;
+	var pathdata;
+	var pathcount = 0;
+	var segmentcount = 0;
+	var eventTime = 0;
+	var startTime = 0;
+	var previousEventTime = 0;
+	var previousXpos = 0;
+	var previousYpos = 0;
+	var Xpos = 0;
+	var Ypos = 0;
+	var pencolour = "#ff0000";
+	var penwidth = 5;
+	var duration = 0;
+	var clear = false;
+
+	var sketchpad = new Raphael(document.getElementById('standaloneviewer'),1,1);
+
+	var logFile;
+	var fileid = getParameterByName('id');
+	var loop = getParameterByName('loop');
+
+	if (fileid) {
+		logFile = "http://art.systems/sketchpad/sketches/"+fileid+".log";
+		console.log(logFile);
+
+		$.getJSON(logFile, function(data) {
+			var dataLength = data.length;
+			console.log("Data Length: "+data.length);
+
+			var i = 0;
+			function parser() {
+				setTimeout(function() {
+					if (clear) {
+						$("svg path").remove();
+						clear = false;
+					}
+					var item = data[i].split(" ");
+					var time = item[0];
+					if ((startTime == 0) && (time != 0)) {
+						startTime = time;
+						console.log("Start Time: "+startTime);
+					}
+					time -= startTime;
+					var type = item[1];
+					var data1 = item[2];
+					var data2 = item[3];
+
+					switch(type) {
+						case 'I': // iOS Flag
+							console.log("iOS: "+data1);
+							duration = 0;
+							break;
+						case 'X': // Canvas Size
+							console.log("Size: "+data1+"x"+data2);
+							sketchpad.setSize(data1,data2);
+							$('#standaloneviewer').css("width", data1);
+							$('#standaloneviewer').css("height", data2);
+							duration = 0;
+
+							screenwidth = window.innerWidth;
+							screenheight = window.innerHeight;
+							$("#standaloneviewer").css({top: (screenheight - data2) / 2, left: (screenwidth - data1) / 2});
+							break;
+						case 'S': // Start Path
+							console.log("Start Path: "+data1+" "+data2);
+							eventTime = time;
+							Xpos = data1;
+							Ypos = data2;
+							previousXpos = Xpos;
+							previousYpos = Ypos;
+							pathdata = "M"+previousXpos+","+(previousYpos-52);
+							path = sketchpad.path(pathdata);
+							path.attr("stroke-width", penwidth);
+							path.attr("stroke", pencolour);
+							path.attr("stroke-linecap", "round");
+							path.attr("stroke-linejoin", "round");
+
+							if (previousEventTime) {
+								duration = eventTime-previousEventTime;
+							}
+							else {
+								duration = 0;
+							}
+							// Maximum Gap Between Paths of 2s
+							if (duration > 2000) {
+								duration = 2000;
+							}
+
+							pathcount++;
+							previousEventTime = eventTime;
+							break;
+						case 'D': // Draw Segment
+							eventTime = time;
+							Xpos = data1;
+							Ypos = data2;
+							pathdata += "L"+Xpos+","+(Ypos-52);
+							path.attr("path", pathdata);
+							previousXpos = Xpos;
+							previousYpos = Ypos;
+							duration = eventTime-previousEventTime;
+							segmentcount++;
+							previousEventTime = eventTime;
+							break;
+						case 'E': // End Path
+							console.log("End Path: "+data1+" "+data2);
+							eventTime = time;
+							previousEventTime = eventTime;
+							duration = 0;
+							break;
+						case 'C': // Pen Colour
+							console.log("Pen Colour: "+data1);
+							pencolour = data1;
+							duration = 0;
+							break;
+						case 'P': // Pen Width
+							console.log("Pen Width: "+data1);
+							penwidth = data1;
+							duration = 0;
+							break;
+						case 'U': // Undo
+							console.log("Undo Path");
+							$("svg path:last-child").remove();
+							break;
+					}
+
+					i++;
+					if (i < dataLength) {
+						parser();
+					}
+					else {
+						if (loop) {
+							i = 0;
+							clear = true;
+							duration = loop;
+							console.log("Loop: "+duration+"ms");
+							parser();
+						}
+					}
+				}, duration)
+			}
+			parser();
+		});
+	}
+
+	$(window).resize(function() {
+		screenwidth = window.innerWidth;
+		screenheight = window.innerHeight;
+		$("#standaloneviewer").css({top: (screenheight - $("#standaloneviewer").height()) / 2, left: (screenwidth - $("#standaloneviewer").width()) / 2});
+	});
+	</script>
+</body>
+</html>

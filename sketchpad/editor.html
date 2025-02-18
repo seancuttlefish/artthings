@@ -1,0 +1,309 @@
+<!--
+	15th July 2017
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+	Drawing Gesture Editor
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="robots" content="noindex">
+	<title>Editor</title>
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+	<script type="text/javascript" src="/js/raphael.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="style.css" />
+	<link rel="apple-touch-icon" href="touch-icon-iphone.png" />
+	<link rel="apple-touch-icon" sizes="152x152" href="touch-icon-ipad.png" />
+	<link rel="apple-touch-icon" sizes="180x180" href="touch-icon-iphone-retina.png" />
+	<link rel="apple-touch-icon" sizes="167x167" href="touch-icon-ipad-retina.png" />
+	<link rel="shortcut icon" href="favicon.ico">
+	<meta name='viewport' content='user-scalable=yes, initial-scale=1.0, maximum-scale=1.0, width=device-width'>
+</head>
+<body>
+	<div id="toolbar">
+		<div class="left">
+			<span id="menu">
+				<button id="menubutton" onclick="" title="Main Menu"><img src="images/menu.png" /></button>
+			</span>
+			<span id="openpalette">
+				<button id="openbutton" onclick="openfromserver();" title="Open from Server"><img src="images/open.png" /></button>
+				<button id="importbutton" onclick="importlog();" title="Import Log File"><img src="images/import.png" /></button>
+			</span>
+			<span id="savepalette">
+				<button id="savebutton" onclick="" title="Save to Server"><img src="images/save.png" /></button>
+				<button id="downloadsvgbutton" onclick="downloadSVG();" title="Download SVG Image"><img src="images/svg.png" /></button>
+				<button id="downloadpngbutton" onclick="downloadPNG();" title="Download PNG Image"><img src="images/png.png" /></button>
+				<button id="downloadpngbutton" onclick="downloadLog();" title="Download Log File"><img src="images/log.png" /></button>
+			</span>
+			<span id="playpalette">
+				<button id="playbutton" onclick="play();" title="Play"><img src="images/play.png" /></button>
+				<button id="fastforwardbutton" onclick="" title="Fast Forward"><img src="images/fastforward.png" /></button>
+			</span>
+			<span id="toolspalette">
+				<button id="optimisebutton" onclick="" title="Optimise Log File"><img src="images/optimise.png" /></button>
+				<button id="smoothbutton" onclick="" title="Smooth Paths"><img src="images/smooth.png" /></button>
+				<button id="invertbutton" onclick="" title="Invert Colours"><img src="images/invert.png" /></button>
+			</span>
+		</div>
+		<div class="right">
+			<button id="deletebutton" onclick="" title="Delete from Server"><img src="images/delete.png" /></button>
+		</div>
+	</div>
+	<div id="browser"></div>
+	<div id="sketchpad"></div>
+	<div id="information"></div>
+	<div id="time"></div>
+
+	<script type="text/javascript">
+
+	version = "Editor 0.1.1";
+	$('#information').html(version);
+	console.log(version);
+
+	function mainmenu() {
+		$('#penmenu').hide('fast');
+		if ($('#mainmenu').is(":visible")) {
+			$('#mainmenu').hide('fast');
+		}
+		else {
+			$('#mainmenu').show('fast');
+		}
+	}
+
+	function getParameterByName(name, url) {
+		if (!url) url = window.location.href;
+		name = name.replace(/[\[\]]/g, "\\$&");
+		var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+			results = regex.exec(url);
+		if (!results) return null;
+		if (!results[2]) return '';
+		return decodeURIComponent(results[2].replace(/\+/g, " "));
+	}
+
+	var path;
+	var pathdata;
+	var pathcount;
+	var segmentcount;
+
+	var eventTime;
+	var startTime;
+	var previousEventTime;
+	var previousXpos;
+	var previousYpos;
+	var Xpos;
+	var Ypos;
+	var duration;
+	var playback;
+
+	var pencolour = "#ff0000";
+	var penwidth = 5;
+
+	var sketchpad = new Raphael(document.getElementById('sketchpad'),1,1);
+
+	var logFile;
+
+	function viewer(fileid) {
+		$('#browser').hide();	
+		$('#sketchpad').show();
+		$('#information').show();
+		$('#time').show();
+
+		$('#menu').show();
+		$('#openpalette').show();
+		$('#savepalette').show();
+		$('#playpalette').show();
+		$('#toolspalette').show();
+		$('#deletebutton').show();
+
+		logFile = "http://art.systems/sketchpad/sketches/"+fileid+".log";
+
+		playback = true;
+		$("svg path").remove();
+		$.getJSON(logFile, function(data) {
+			var dataLength = data.length;
+			console.log("Data Length: "+data.length);
+
+			var i = 0;
+			eventTime = 0;
+			startTime = 0;
+			previousEventTime = 0;
+			duration = 0;
+			pathcount = 0;
+			segmentcount = 0;
+
+			function parser() {
+				setTimeout(function() {
+					var item = data[i].split(" ");
+					var time = item[0];
+					if ((startTime == 0) && (time != 0)) {
+						startTime = time;
+						console.log("Start Time: "+startTime);
+					}
+					time -= startTime;
+					var type = item[1];
+					var data1 = item[2];
+					var data2 = item[3];
+					$('#time').html("Time: "+Math.round(time/1000)+"s");
+
+					switch(type) {
+						case 'I': // iOS Flag
+							console.log("iOS: "+data1);
+							duration = 0;
+							break;
+						case 'X': // Canvas Size
+							console.log("Size: "+data1+"x"+data2);
+							sketchpad.setSize(data1,data2);
+							$('#sketchpad').css("width", data1);
+							$('#sketchpad').css("height", data2);
+							duration = 0;
+							break;
+						case 'S': // Start Path
+							console.log("Start Path: "+data1+" "+data2);
+							eventTime = time;
+							Xpos = data1;
+							Ypos = data2;
+							previousXpos = Xpos;
+							previousYpos = Ypos;
+							pathdata = "M"+previousXpos+","+(previousYpos-52);
+							path = sketchpad.path(pathdata);
+							path.attr("stroke-width", penwidth);
+							path.attr("stroke", pencolour);
+							path.attr("stroke-linecap", "round");
+							path.attr("stroke-linejoin", "round");
+
+							if (previousEventTime) {
+								duration = eventTime-previousEventTime;
+							}
+							else {
+								duration = 0;
+							}
+							// Maximum Gap Between Paths of 2s
+							if (duration > 2000) {
+								duration = 2000;
+							}
+							$('#time').html("Waiting: "+duration+"ms");
+
+							pathcount++;
+							previousEventTime = eventTime;
+							break;
+						case 'D': // Draw Segment
+							eventTime = time;
+							Xpos = data1;
+							Ypos = data2;
+							pathdata += "L"+Xpos+","+(Ypos-52);
+							path.attr("path", pathdata);
+							previousXpos = Xpos;
+							previousYpos = Ypos;
+							duration = eventTime-previousEventTime;
+							segmentcount++;
+							previousEventTime = eventTime;
+							break;
+						case 'E': // End Path
+							console.log("End Path: "+data1+" "+data2);
+							eventTime = time;
+							previousEventTime = eventTime;
+							duration = 0;
+							break;
+						case 'C': // Pen Colour
+							console.log("Pen Colour: "+data1);
+							$('#information').html("Pen Colour: "+data1);
+							pencolour = data1;
+							duration = 0;
+							break;
+						case 'P': // Pen Width
+							console.log("Pen Width: "+data1);
+							$('#information').html("Pen Width: "+data1);
+							penwidth = data1;
+							duration = 0;
+							break;
+						case 'U': // Undo
+							console.log("Undo Path");
+							$('#information').html("Undo Path");
+							$("svg path:last-child").remove();
+							break;
+					}
+
+					i++;
+					if ((i < dataLength) && playback) {
+						parser();
+					}
+					else {
+						$('#information').html("Paths: "+pathcount+" / Segments: "+segmentcount);
+					}
+				}, duration)
+			}
+			parser();
+		});
+	}
+
+	function play() {
+	}
+
+	function openfromserver() {
+		$('#browser').show();	
+		$('#sketchpad').hide();
+		$('#information').hide();
+		$('#time').hide();
+
+		$('#menu').show();
+		$('#openpalette').show();
+		$('#savepalette').hide();
+		$('#playpalette').hide();
+		$('#toolspalette').hide();
+		$('#deletebutton').hide();
+
+		playback = false;
+		$.getJSON('open.php', function(data) {
+			var output = "<ul>";
+			for (i=0;i<data.files.length;i++) {
+				if (data.files[i].includes('.log')) {
+					var file = data.files[i].split(".");
+					output += "<li><a href='#' onclick=\"viewer('"+file[0]+"');return false;\"><img src='http://art.systems/sketchpad/sketches/"+file[0]+".png' /></a></li>";
+				}
+			}
+			output += "</ul>";
+			$('#browser').html(output);
+		});
+	}
+
+	function importlog() {
+	}
+
+
+	function downloadSVG() {
+		$('#penmenu').hide();
+
+		var svgString = document.getElementById('sketchpad').innerHTML,
+			svgBlob = new Blob([svgString], {"type": "image/svg+xml"}),
+			svgFilename = "sketchpad.svg";
+		saveAs(svgBlob, svgFilename);
+	}
+
+	function downloadPNG() {
+		$('#penmenu').hide();
+
+		var svgString = document.getElementById('sketchpad').innerHTML,
+			canvas = document.createElement('canvas'),
+			pngFilename = "sketchpad.png";
+		canvg(canvas, svgString);
+		canvas.toBlob(function(blob) {
+    		saveAs(blob, pngFilename);
+		});
+	}
+
+	function downloadLog() {
+		$('#penmenu').hide('fast');
+
+		var logString = JSON.stringify(log),
+			logBlob = new Blob([logString], {"type": "application/json"}),
+			logFilename = "sketchpad.log";
+		saveAs(logBlob, logFilename);
+	}
+
+	openfromserver();
+
+	</script>
+</body>
+</html>

@@ -1,0 +1,320 @@
+<!--
+	7th September 2020
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+	sDistant Drums (Bass)
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="robots" content="noindex">
+	<title>Distant Drums (Bass)</title>
+	<script type="text/javascript" src="./js/jquery.min.js"></script>
+	<script type="text/javascript" src="./js/mqttws31.min.js"></script>
+	<script type="text/javascript" src="./js/chance.min.js"></script>
+	<script type="text/javascript" src="./files/cues.json"></script>
+	<style type="text/css">
+		body {
+			background-color: #000;
+			-webkit-user-select: none;
+			-webkit-touch-callout: none;
+			cursor: none;
+		 }
+		#canvas {
+			position: fixed;
+		}
+		video {
+			display: block;
+		}
+	</style>
+	<script type="text/javascript">
+		var videoFile = "files/bass.mp4?"+new Chance(Math.random).guid();
+		var heartbeat = 1000;
+		var aspectRatio = 1.777;
+		var counter = -1; // -1 = wait at start, 0 = play at start
+
+		// Load Lighting Cues
+		var lightingCues = JSON.parse(cues);
+		console.log("Lighting Cues: "+lightingCues.length);
+		var cuePosition = 0;
+
+		// artThings
+		var SERVERHOST = "192.168.1.100"
+		var SERVERPORT = 8883;
+		var useSSL = false;
+		console.log(SERVERHOST + ":" + SERVERPORT);
+
+		var instanceid = new Chance(Math.random).guid(); // A unique ID for this instance
+		var componentid = "bass";
+		console.log("Instance ID: " + instanceid);
+
+		var state = {
+			'id': instanceid,
+			'ecosystem': 'cybecol',
+			'system': 'distantdrums',
+			'component': componentid,
+			'packetsin': 0,
+			'packetsout': 0,
+			'ontime': Math.floor(new Date().getTime() / 1000),
+			'uptime': 0,
+			'status': 'ok'
+		}
+
+		var bassok = true;
+		var trebleok = true;
+		var scrollerok = true; //false;
+
+		var volume = 0.5;
+		var myVideo;
+
+		//////////
+		// MQTT //
+		//////////
+
+		var mqttconnected = false;
+		var reconnectTimeout = 10000;
+		MQTTConnect();
+
+		function MQTTConnect() {
+			console.log("Connecting..");
+			client = new Paho.MQTT.Client(SERVERHOST, SERVERPORT, "web_" + new Date().getTime());
+			client.onConnectionLost = onConnectionLost;
+			client.onMessageArrived = onMessageArrived;
+			client.connect({
+			useSSL: useSSL,
+			timeout: 10,
+			onSuccess: onSuccess,
+			onFailure: onFailure
+			});
+		}
+
+		function onSuccess() {
+			console.log("MQTT Connection Established " + SERVERHOST + ":" + SERVERPORT);
+			mqttconnected = true;
+			// Subscribe to core topics
+			client.subscribe(state.ecosystem + "/env/all/hello");
+			client.subscribe(state.ecosystem + "/" + state.system + "/all/hello");
+			client.subscribe(state.ecosystem + "/" + state.system + "/controller/play");
+			client.subscribe(state.ecosystem + "/" + state.system + "/controller/stop");
+			client.subscribe(state.ecosystem + "/" + state.system + "/controller/shutdown");
+			client.subscribe(state.ecosystem + "/" + state.system + "/controller/volup");
+			client.subscribe(state.ecosystem + "/" + state.system + "/controller/voldown");
+			client.subscribe(state.ecosystem + "/" + state.system + "/controller/reload");
+			client.subscribe(state.ecosystem + "/" + state.system + "/treble/state");
+			client.subscribe(state.ecosystem + "/" + state.system + "/scroller/state");
+			// Send state / Heartbeat
+			sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+			var MQTTheartbeat = setInterval(function() {
+			sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+			}, 180000);
+		}
+
+		function onFailure(response) {
+			console.log("MQTT Unable to Connect");
+			mqttconnected = false;
+			setTimeout(MQTTConnect(), reconnectTimeout);
+		}
+
+		function onConnectionLost(response) {
+			console.log("MQTT Connection Lost");
+			mqttconnected = false;
+			setTimeout(MQTTConnect(), reconnectTimeout);
+		}
+
+		function onMessageArrived(message) {
+			// ecology/system/component/event
+			var topics = message.destinationName.split("/");
+			var ecology = topics[0];
+			var system = topics[1];
+			var component = topics[2];
+			var event = topics[3]; // hello
+
+			var packet;
+			var sourceid = "";
+			var data = "";
+			try {
+				packet = JSON.parse(message.payloadString);
+				sourceid = packet.sourceid;
+				data = packet.data;
+			} catch (e) {
+				sourceid = component;
+				data = message.payloadString;
+			}
+			switch (event) {
+				case 'hello':
+					state.uptime = Math.floor(new Date().getTime() / 1000) - state.ontime;
+					sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+					break;
+				case 'play':
+					if (scrollerok) {
+						if (trebleok) {
+							counter = 0;
+							sendmqtt(state.ecosystem + "/" + state.system + "/scroller/text", "");
+							console.log("Welcome to Distant Drums");
+						}
+						else {
+							// send hello. perhaps every 10 hearbeats
+							sendmqtt(state.ecosystem + "/" + state.system + "/scroller/text", "Waiting For Treble.");
+							console.log("Waiting For Treble.");
+						}
+					}
+					else {
+						// send hello
+						sendmqtt(state.ecosystem + "/" + state.system + "/scroller/text", "Waiting For Scroller."); // For Dashboard
+						console.log("Waiting For Scroller.");
+					}
+					break;
+				case 'stop':
+					counter = -1;
+					break;
+				case 'reload':
+					console.log("Reloading...");
+					location.reload();
+					break;
+				case 'volup':
+					volume += 0.1;
+					if (volume > 1) {
+						volume = 1;
+					}
+					myVideo.volume = volume;
+					console.log("Volume Up "+volume);
+					break;
+				case 'voldown':
+					volume-=0.1;
+					if (volume < 0) {
+						volume = 0;
+					}
+					myVideo.volume = volume;
+					console.log("Volumen Down "+volume);
+					break;
+				case 'state':
+					switch(component) {
+						case 'treble':
+							trebleok = true;
+							console.log("Treble OK");
+							break;
+						case 'scroller':
+							scrollerok = true;
+							console.log("Scroller OK");
+							break;
+					}
+					// check for treble and scroller states
+					break;
+			}
+			console.log("MQTT Message Received: " + message.destinationName);
+			state.packetsin++;
+			mqttconnected = true;
+		}
+
+		function sendmqtt(topic, packet) {
+			var message = new Paho.MQTT.Message(JSON.stringify(packet));
+			message.destinationName = topic;
+			client.send(message);
+			console.log("MQTT Message Sent " + topic);
+			state.packetsout++;
+		}
+
+		//////////
+		// Main //
+		//////////
+
+		function start() {
+
+			myVideo = document.getElementById("video");
+			myVideo.setAttribute("src", videoFile);
+			myVideo.load();
+			myVideo.volume = volume;
+
+			resizecanvas();
+
+			var videoTimer = setInterval(function() {
+				if (counter == -1) {
+					if (!myVideo.paused) {
+						sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/stopped", "");
+						myVideo.pause();
+						myVideo.currentTime = 0;
+						cuePosition = 0;
+					}
+				}
+				else {
+					if (counter == 0) {
+						sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/play", "");
+						sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/started", "");
+						myVideo.play();
+						myVideo.currentTime = 0;
+						cuePosition = 0;
+					}
+					else {
+						// Process Cues
+						if (cuePosition < lightingCues.length) {
+							if (counter == lightingCues[cuePosition].time) {
+								sendmqtt(state.ecosystem + "/" + state.system + "/scroller/text", lightingCues[cuePosition].text);
+								console.log(lightingCues[cuePosition].text);
+								cuePosition++;
+							}
+						}
+					}
+					console.log(counter);
+					counter++;
+				}
+			}, heartbeat);
+
+			myVideo.onloadedmetadata = function() {
+				if (myVideo.buffered.length === 0) return;
+				var bufferedSeconds = myVideo.buffered.end(0) - video.buffered.start(0);
+				console.log(bufferedSeconds + ' seconds of video preloaded.');
+			};
+
+			myVideo.onended = function() {
+				sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/ended", "");
+				counter = 0;
+			};
+		}
+
+		function resizecanvas() {
+			var screenwidth = window.innerWidth;
+			var screenheight = window.innerHeight;
+
+			var canvash = screenheight;
+			var canvasw = screenwidth;
+			if (canvasw > canvash * aspectRatio) {
+				canvasw = Math.floor(canvash * aspectRatio);
+			} else {
+				canvash = Math.floor(canvasw / aspectRatio);
+			}
+
+			if ((canvash < 0) || (canvasw < 0)) {
+				canvash = 0;
+				canvasw = 0;
+			}
+
+			canvast = Math.floor((screenheight - canvash) / 2);
+			canvasl = Math.floor((screenwidth - canvasw) / 2);
+			console.log("ScreenSize: " + screenwidth + "x" + screenheight + " Canvas: " + canvasw + "x" + canvash);
+
+			$("#canvas").css({
+				"top": canvast,
+				"left": canvasl,
+				"width": canvasw,
+				"height": canvash
+			});
+			$("video").css({
+				"width": canvasw
+			});
+		}
+
+		$(window).resize(function() {
+			resizecanvas();
+		});
+	</script>
+</head>
+
+<body onload="start();">
+	<div id="canvas">
+		<video id="video" playsinline>
+			<source preload="auto" src="" type="video/mp4">
+		</video>
+	</div>
+</body>
+</html>

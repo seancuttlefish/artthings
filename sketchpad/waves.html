@@ -1,0 +1,242 @@
+<!--
+	19th November 2019
+	Waves (Canvas Version)
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="robots" content="noindex">
+	<title>Waves (Raphael)</title>
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+	<script type="text/javascript" src="/js/raphael.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="style.css" />
+	<meta name='viewport' content='user-scalable=yes, initial-scale=1.0, maximum-scale=1.0, width=device-width'>
+</head>
+<body>
+	<div id="matrixviewer"></div>
+	<div id="information"></div>
+
+	<script type="text/javascript">
+
+/***********/
+/* JS Code */
+/***********/
+
+$(document).ready(function() {
+	$(document).keypress(function(e) {
+			if (e.keyCode === 105) {
+				$("#information").toggle();
+			}
+	});
+});
+
+var matrixx = 32,  matrixy = 32;
+var canvaswidth = 400, canvasheight = 400;
+var matrixcanvas = new Raphael(document.getElementById('matrixviewer'),canvaswidth,canvasheight);
+var cells = [];
+var zigzag = false;
+
+function connectToLights() {
+	for (y=0; y<matrixy; y++) {
+		for (x=0; x<matrixx; x++) {
+			if (zigzag) {
+				if (y%2) {
+					cells.push(matrixcanvas.ellipse(x*(canvaswidth/matrixx)+(canvaswidth/matrixx/2),y*(canvasheight/matrixy)+(canvasheight/matrixy/2),(canvaswidth/matrixx/2)-2,(canvasheight/matrixy/2)-2).attr({
+						fill: "rgb(0,0,0)",
+						stroke: "none"
+					}));
+				}
+				else {
+					cells.push(matrixcanvas.ellipse((matrixx-x-1)*(canvaswidth/matrixx)+(canvaswidth/matrixx/2),y*(canvasheight/matrixy)+(canvasheight/matrixy/2),(200/matrixx)-2,(canvasheight/matrixy/2)-2).attr({
+						fill: "rgb(0,0,0)",
+						stroke: "none"
+					}));
+				}
+			}
+			else {
+				cells.push(matrixcanvas.ellipse(x*(canvaswidth/matrixx)+(canvaswidth/matrixx/2),y*(canvasheight/matrixy)+(canvasheight/matrixy/2),(canvaswidth/matrixx/2)-2,(canvasheight/matrixy/2)-2).attr({
+					fill: "rgb(0,0,0)",
+					stroke: "none"
+				}));
+			}
+		}
+	}
+}
+
+function setLight(i, r, g, b) {
+	cells[i].attr({
+		fill: "rgb("+r+","+g+","+b+")"
+	});
+
+}
+
+function updateLights() {
+}
+
+function random(val) {
+	return Math.floor(Math.random()*val);
+}
+
+function floor(val) {
+	return Math.floor(val);
+}
+
+function levelfunc(val) {
+	return Math.sin(val); // value between 0 and 1
+}
+
+function updatestatus() {
+	frameTime = currentFrameTime-previousFrameTime;
+	frameRate = floor(1000/frameTime);
+	if (frameTime < 0) {
+		frameTime = 0;
+		frameRate = "";
+	}
+	info = "<div><span>"+frameDelay+" "+speedFactor+" "+frameRate+"</span></div>";
+	for (i=0; i<waves.length; i++) {
+		info += "<div><span>"+floor(waves[i][1])+"</span> ";
+		info += "<span>"+waves[i][2]+"</span> ";
+		info += "<span>"+waves[i][3]+"</span> ";
+		info += "<span>"+waves[i][4]+"</span> ";
+		info += "<span>"+waves[i][5]+"</span> ";
+		info += "<span>"+waves[i][6]+"</span> ";
+		info += "<span>"+waves[i][7]+"</span> ";
+		info += "<span>"+waves[i][8]+"</span></div>";
+	}
+	$('#information').html(info);
+}
+
+/**********************
+* Cross Platform Code *
+***********************/
+
+// Variables
+var numLights = matrixx*matrixy;
+var frameDelay = 20;
+var currentFrameTime, previousFrameTime, frameTime, frameRate;
+var speedFactor = 1;
+var frameCounter = 0;
+var lightLevel, totalL, totalR, totalG, totalB;
+
+var i, j, x, y;
+var r, g, b;
+var rinc, ginc, binc;
+
+var waves = [];
+// status, position, position_inc, r%, g%, b%, amplitude, wavelength, cycles
+var lights = [];
+// status, level, inc, r%, g%, b%
+
+setup();
+var t = setTimeout(loop, 100); // Start
+
+function setup() {
+  // Publish Status
+	version = "Waves 0.2";
+	$('#information').text(version);
+	console.log(version);
+
+  // Connect to Lights
+  connectToLights();
+
+  // Setup Waves
+	waves = [
+		// status, position, position_inc, r%, g%, b%, amplitude, wavelength, cycles
+		[true, random(numLights), random(10)/10, random(100), random(100), random(100), 100, random(20)+30, 1],
+		[true, random(numLights), random(10)/10, random(100), random(100), random(100), 100, random(20)+30, 1],
+		[true, random(numLights), random(10)/10, random(100), random(100), random(100), 100, random(20)+30, 1],
+		[true, random(numLights), random(10)/10, random(100), random(100), random(100), 100, random(20)+30, 1],
+		[true, random(numLights), random(10)/10, random(100), random(100), random(100), 100, random(20)+30, 1],
+		[true, random(numLights), random(10)/10, random(100), random(100), random(100), 100, random(20)+30, 1],
+		[true, random(numLights), random(10)/10, random(100), random(100), random(100), 100, random(20)+30, 1],
+		[true, random(numLights), random(10)/10, random(100), random(100), random(100), 100, random(20)+30, 1],
+		[true, random(numLights), random(10)/10, random(100), random(100), random(100), 100, random(20)+30, 1],
+		[true, random(numLights), random(10)/10, random(100), random(100), random(100), 100, random(20), 1]
+	];
+
+  // Setup Lights
+	for (i=0; i<numLights; i++) {
+		// status, level, inc, r%, g%, b%
+		lights[i] = [false, 0, 0, 0, 0, 0];
+	}
+  updateLights();
+}
+
+function loop() {
+	currentFrameTime = new Date().getMilliseconds();
+
+	// Process Waves
+	for (i=0; i<waves.length; i++) {
+		waves[i][1] += waves[i][2];
+		if (waves[i][1] > numLights) {
+			waves[i][1] = 0;
+		}
+		if (waves[i][1] < 0) {
+			waves[i][1] = numLights;
+		}
+	}
+
+	// Generate Lights
+	for (i=0; i<numLights; i++) {
+		// status, position, position_inc, r%, g%, b%, amplitude, wavelength, cycles
+		lights[i][0] = false;
+		spriteCount = 0;
+		totalL = 0;
+		totalR = 0;
+		totalG = 0;
+		totalB = 0;
+
+		for (j=0; j<waves.length; j++) {
+			// status, level, inc, r%, g%, b%
+			if ((i > numLights-waves[j][1]) && (i < numLights-waves[j][1]+(numLights/waves[j][7]*waves[j][8]))) {
+				lightLevel = levelfunc(2*Math.PI*waves[j][7]*((i+waves[j][1])/numLights))*255;
+				if (lightLevel > 0) {
+					totalL += lightLevel;
+					totalR += waves[j][3]*waves[j][6]/100;
+					totalG += waves[j][4]*waves[j][6]/100;
+					totalB += waves[j][5]*waves[j][6]/100;
+					spriteCount++;
+				}
+			}
+		}
+		if (totalL > 0) {
+			if (totalL > 255) {
+				totalL = 255;
+			}
+			lights[i][0] = true;
+			lights[i][1] = totalL;
+			lights[i][3] = totalR/spriteCount;
+			lights[i][4] = totalG/spriteCount;
+			lights[i][5] = totalB/spriteCount;
+		}
+	}
+
+	// Render Lights
+	for (i=0; i<numLights; i++) {
+		// status, level, inc, r%, g%, b%
+		if (lights[i][0]) {
+			r = lights[i][1]*lights[i][3]/100;
+			g = lights[i][1]*lights[i][4]/100;
+			b = lights[i][1]*lights[i][5]/100;
+			setLight(i, r, g, b);
+		}
+		else {
+			setLight(i, 0, 0, 0);
+		}
+	}
+
+	updatestatus();
+	updateLights();
+	frameCounter++;
+	previousFrameTime = currentFrameTime;
+
+	clearTimeout(t)
+	t = setTimeout(loop, frameDelay/speedFactor);
+}
+
+	</script>
+</body>
+</html>

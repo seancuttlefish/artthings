@@ -1,0 +1,334 @@
+<!--
+	8th November 2021
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+	Light Control
+-->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="robots" content="noindex">
+	<title>CJ Lights</title>
+
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+	<script type="text/javascript" src="/js/mqttws31.min.js"></script>
+	<script type="text/javascript" src="/js/jquery.mobile-events.min.js"></script>
+	<script type="text/javascript" src="/js/chance.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="style.css">
+	<meta name="viewport" content="user-scalable=no, width=320">
+	<link rel="apple-touch-icon" href="touch-icon-iphone.png">
+	<script type="text/javascript">
+
+var SERVERHOST = "iot.artthings.io";
+var SERVERPORT = 8884;
+var useSSL = true;
+console.log(SERVERHOST + ":" + SERVERPORT);
+
+var instanceid = new Chance(Math.random).guid(); // A unique ID for this instance
+console.log("Instance ID: "+instanceid);
+
+componentid = "controller";
+console.log("Component ID: "+componentid); // The specific componentid
+
+var version = "CJ Lights 1.0.0";
+console.log(version);
+
+var lock = false;
+var timeout;
+
+// Cybernetic Ecology Message Parameters
+var state = {
+	'id': instanceid,
+	'ecosystem': 'cybecol',
+	'system': 'cjlights',
+	'component': componentid,
+	"packetsin": 0,
+	"packetsout": 0,
+	"ontime": Math.floor(new Date().getTime() / 1000),
+	"uptime": 0,
+	"status": "ok"
+}
+console.log(state.id);
+
+//////////
+// MQTT //
+//////////
+
+var mqttconnected = false;
+var reconnectTimeout = 10000;
+MQTTConnect();
+
+// MQTT Functions
+function MQTTConnect() {
+	console.log("Connecting..");
+	$('#information').text("Connecting..");
+	client = new Paho.MQTT.Client(SERVERHOST, SERVERPORT, "web_" + new Date().getTime());
+	client.onConnectionLost = onConnectionLost;
+	client.onMessageArrived = onMessageArrived;
+	client.connect({
+		useSSL: useSSL,
+		timeout: 10,
+		onSuccess: onSuccess,
+		onFailure: onFailure
+	});
+}
+
+function onSuccess() {
+	console.log("MQTT client connected to " + SERVERHOST + ":" + SERVERPORT);
+	mqttconnected = true;
+	$("#status").text("Connected");
+	// Subscribe to core topics
+	client.subscribe(state.ecosystem + "/env/all/hello");
+	client.subscribe(state.ecosystem + "/" + state.system + "/all/hello");
+	client.subscribe(state.ecosystem + "/" + state.system + "/" + state.id + "/hello");
+	client.subscribe(state.ecosystem + "/" + state.system + "/+/set");
+	client.subscribe(state.ecosystem + "/" + state.system + "/+/picture");
+	client.subscribe(state.ecosystem + "/" + state.system + "/+/state");
+	client.subscribe(state.ecosystem + "/" + state.system + "/+/done");
+	// Send state
+	sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+}
+
+function onFailure(responseObject) {
+	mqttconnected = false;
+	$("#status").text("Lost Connection");
+	console.log("MQTT Failure: " + responseObject.errorMessage);
+	setTimeout(MQTTConnect(), reconnectTimeout);
+}
+
+function onConnectionLost(responseObject) {
+	mqttconnected = false;
+	$("#status").text("Lost Connection");
+	console.log("MQTT Lost connection: " + responseObject.errorMessage);
+	setTimeout(MQTTConnect(), reconnectTimeout);
+}
+
+function onMessageArrived(message) {
+	// ecology/system/component/event
+	var topics = message.destinationName.split("/");
+	var ecology = topics[0];
+	var system = topics[1];
+	var component = topics[2];
+	var event = topics[3];
+
+	try {
+		var packet = JSON.parse(message.payloadString);
+		var sourceid = packet.sourceid;
+		var data = packet.data;
+	} catch (e) {
+		var sourceid = component;
+		var data = packet;
+	}
+
+	switch (event) {
+		case "hello":
+			state.uptime = Math.floor(new Date().getTime() / 1000) - state.ontime;
+			sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+			break;
+		case "set":
+			$(".all").css("background-color", "#f00");
+			break;
+		case "picture":
+			$(".all").css("background-color", "#f00");
+			break;
+		case "done":
+			$("#id" + component).css("background-color", "#ff0");
+			break;
+		case "state":
+			$("#id" + component).css("background-color", "#0f0");
+			break;
+	}
+	console.log("MQTT: received " + message.destinationName);
+	state.packetsin++;
+}
+
+function sendmqtt(topic, packet) {
+	if (!lock) {
+		var message = new Paho.MQTT.Message(JSON.stringify(packet));
+		message.destinationName = topic;
+		client.send(message);
+		console.log("MQTT Message Sent "+topic);
+		state.packetsout++;
+	}
+}
+
+function buttonlock() {
+	clearTimeout(timeout);
+	lock = true;
+	$("body").css("opacity", "0.5");
+	timeout = setTimeout(timeoutfunc, 2000);
+}
+
+function timeoutfunc() {
+	lock = false;
+	$("body").css("opacity", "1.0");
+}
+
+function sendmessage(topic, data) {
+	sendmqtt(state.ecosystem + "/" + state.system + "/" + topic, data);
+}
+
+function heart() {
+	if (!lock) {
+		for (i=1;i<6;i++) {
+			sprite = Math.floor(Math.random()*3)+1;
+			switch (sprite) {
+				case 1:
+					sendmqtt('cybecol/cjlights/1'+i+'/picture','0330033066666666634346666664666306666660006663000003300000000000');
+					break;
+				case 2:
+					sendmqtt('cybecol/cjlights/1'+i+'/picture','0000000004400440433443344326663404666340004334000004400000000000');
+					break;
+				case 3:
+					sendmqtt('cybecol/cjlights/1'+i+'/picture','00000000044004404CC44CC44CCCC2C404CCCC40004CC4000004400000000000');
+				break;
+			}
+		}
+		lock = true;
+		$("body").css("opacity", "0.5");
+		timeout = setTimeout(timeoutfunc, 2000);
+	}
+}
+function invader() {
+	if (!lock) {
+		for (i=1;i<6;i++) {
+			sprite = Math.floor(Math.random()*5)+1;
+			switch (sprite) {
+				case 1:
+					sendmqtt('cybecol/cjlights/1'+i+'/picture','BBBBBBB0B4BBB4B0BBBBBBB0BBBBBBB0B00B00B0B00B00B0B00B00B0B00B00B0');
+					break;
+				case 2:
+					sendmqtt('cybecol/cjlights/1'+i+'/picture','0000000004444440042002400004400044444444404004044040040400000000')
+					break;
+				case 3:
+					sendmqtt('cybecol/cjlights/1'+i+'/picture','F00000F00F000F0000FFF000FFE0EFF0F00F00F0F00F00F0F00F00F000000000');
+					break;
+				case 4:
+					sendmqtt('cybecol/cjlights/1'+i+'/picture','0000000070000070077777007780877070707070707070707070707000000000');
+					break;
+				case 5:
+					sendmqtt('cybecol/cjlights/1'+i+'/picture','0000000000222200020220200222222000222200020000200020020000000000');
+					break;
+			}
+		}
+		lock = true;
+		$("body").css("opacity", "0.5");
+		timeout = setTimeout(timeoutfunc, 2000);
+	}
+}
+function mixed() {
+	if (!lock) {
+		for (i=1;i<6;i++) {
+			sprite = Math.floor(Math.random()*6)+1;
+			switch (sprite) {
+				case 1:
+					sendmqtt('cybecol/cjlights/1'+i+'/picture','BBBBBBB0B4BBB4B0BBBBBBB0BBBBBBB0B00B00B0B00B00B0B00B00B0B00B00B0');
+					break;
+				case 2:
+					sendmqtt('cybecol/cjlights/1'+i+'/picture','0000000004444440042002400004400044444444404004044040040400000000')
+					break;
+				case 3:
+					sendmqtt('cybecol/cjlights/1'+i+'/picture','F00000F00F000F0000FFF000FFE0EFF0F00F00F0F00F00F0F00F00F000000000');
+					break;
+				case 4:
+					sendmqtt('cybecol/cjlights/1'+i+'/picture','0330033066666666634346666664666306666660006663000003300000000000');
+					break;
+				case 5:
+					sendmqtt('cybecol/cjlights/1'+i+'/picture','0000000004400440433443344326663404666340004334000004400000000000');
+					break;
+				case 6:
+					sendmqtt('cybecol/cjlights/1'+i+'/picture','00000000044004404CC44CC44CCCC2C404CCCC40004CC4000004400000000000');
+				break;
+			}
+		}
+		lock = true;
+		$("body").css("opacity", "0.5");
+		timeout = setTimeout(timeoutfunc, 2000);
+	}
+}
+
+	</script>
+</head>
+
+<body>
+	<div id="body">
+		<h1>Circuit of Life</h1>
+		<div class="buttonbar">
+			<p>
+				<button class="bluecheck" style="background-color: #00ff00;" onclick="sendmqtt('cybecol/cjlights/all/set','1,0,0,255,0,0');sendmqtt('cybecol/cjlights/all/set','8,0,255,0,50,10');sendmqtt('cybecol/cjlights/all/set','0,0,0,0,0,0');buttonlock();"></button>
+				<button style="background-color: #0000ff;" onclick="sendmqtt('cybecol/cjlights/all/set','4,0,255,0,0,0');sendmqtt('cybecol/cjlights/all/set','0,0,0,0,0,0');buttonlock();"></button>
+				<button class="bluecheck" style="background-color: #ff0000;" onclick="sendmqtt('cybecol/cjlights/all/set','1,255,0,0,0,0');sendmqtt('cybecol/cjlights/all/set','8,0,255,0,50,10');sendmqtt('cybecol/cjlights/all/set','0,0,0,0,0,0');buttonlock();"></button>
+			</p>
+			<p>
+				<button style="background-color: #00ff00;" onclick="sendmqtt('cybecol/cjlights/all/set','4,0,0,255,0,0');sendmqtt('cybecol/cjlights/all/set','0,0,0,0,0,0');buttonlock();"></button>
+				<button style="background-color: #ffffff;" onclick="sendmqtt('cybecol/cjlights/all/set','4,128,128,128,0,0');sendmqtt('cybecol/cjlights/all/set','0,0,0,0,0,0');buttonlock();"></button>
+				<button style="background-color: #ff0000;" onclick="sendmqtt('cybecol/cjlights/all/set','4,255,0,0,0,0');sendmqtt('cybecol/cjlights/all/set','0,0,0,0,0,0');buttonlock();"></button>
+			</p>
+			<p>
+				<button class="yellowcheck" style="background-color: #00ff00;" onclick="sendmqtt('cybecol/cjlights/all/set','1,0,0,255,0,0');sendmqtt('cybecol/cjlights/all/set','8,128,0,128,50,10');sendmqtt('cybecol/cjlights/all/set','0,0,0,0,0,0');buttonlock();"></button>
+				<button style="background-color: #ffff00;" onclick="sendmqtt('cybecol/cjlights/all/set','4,128,0,128,0,0');sendmqtt('cybecol/cjlights/all/set','0,0,0,0,0,0');buttonlock();"></button>
+				<button class="yellowcheck" style="background-color: #ff0000;" onclick="sendmqtt('cybecol/cjlights/all/set','1,255,0,0,0,0');sendmqtt('cybecol/cjlights/all/set','8,128,0,128,50,10');sendmqtt('cybecol/cjlights/all/set','0,0,0,0,0,0');buttonlock();"></button>
+			</p>
+		</div>
+		<div class="spritebar">
+			<p>
+				<img src="heart.jpg"  onclick="heart();" />
+				<img src="invader.jpg"  onclick="invader();" />
+				<img src="mixed.jpg"  onclick="mixed();" />
+			</p>
+<!--
+			<p>
+        	    <button onclick="sendmqtt('cybecol/cjlights/all/picture','0330033066666666634346666664666306666660006663000003300000000000');">Heart 1</button>
+           		<button onclick="sendmqtt('cybecol/cjlights/all/picture','0000000004400440433443344326663404666340004334000004400000000000');">Heart 2</button>
+            	<button onclick="sendmqtt('cybecol/cjlights/all/picture','00000000044004404CC44CC44CCCC2C404CCCC40004CC4000004400000000000');">Heart 3</button>
+			</p>
+			<p>
+			    <button onclick="sendmqtt('cybecol/cjlights/all/picture','BBBBBBB0B4BBB4B0BBBBBBB0BBBBBBB0B00B00B0B00B00B0B00B00B0B00B00B0');">Invader 1</button>
+            	<button onclick="sendmqtt('cybecol/cjlights/all/picture','0000000004444440042002400004400044444444404004044040040400000000');">Invader 2</button>
+            	<button onclick="sendmqtt('cybecol/cjlights/all/picture','F00000F00F000F0000FFF000FFE0EFF0F00F00F0F00F00F0F00F00F000000000');">Invader 3</button>
+			</p>
+			<p>
+            	<button onclick="sendmqtt('cybecol/cjlights/all/picture','0000000070000070077777007780877070707070707070707070707000000000');">Invader 4</button>
+            	<button onclick="sendmqtt('cybecol/cjlights/all/picture','0000000000222200020220200222222000222200020000200020020000000000');">Invader 5</button>
+	        	<button onclick="sendmqtt('cybecol/cjlights/all/picture','0000000000000000000000000000000000000000000000000000000000000000');">Clear</button>
+        	</p>
+-->
+        </div>
+		<div class="statusbar">
+			<p>
+				<div id="id01" title="01" class="all" style="background-color: #666;"></div>
+				<div id="id02" title="02" class="all" style="background-color: #666;"></div>
+				<div id="id03" title="03" class="all" style="background-color: #666;"></div>
+				<div id="id04" title="04" class="all" style="background-color: #666;"></div>
+				<div id="id05" title="05" class="all" style="background-color: #666;"></div>
+				<!--<div id="id06" title="06" class="all" style="background-color: #666;"></div>
+				<div id="id07" title="07" class="all" style="background-color: #666;"></div>
+				<div id="id08" title="08" class="all" style="background-color: #666;"></div>
+				<div id="id09" title="09" class="all" style="background-color: #666;"></div>
+				<div id="id10" title="10" class="all" style="background-color: #666;"></div>-->
+				<div id="id11" title="11" class="all" style="background-color: #666;"></div>
+				<div id="id12" title="12" class="all" style="background-color: #666;"></div>
+				<div id="id13" title="13" class="all" style="background-color: #666;"></div>
+				<div id="id14" title="14" class="all" style="background-color: #666;"></div>
+				<div id="id15" title="15" class="all" style="background-color: #666;"></div>
+			</p>
+		</div>
+		<div class="links">
+			<p><a href="https://if-oxford.com/event/glow-your-own-led-switch-on-2021/?fbclid=IwAR1TB2eN_GprAS_Q5QnxP90qqBgWFU1Y-pj7kwvYa15kg4ZK_P8waD8OgZw">Glow Your Own</a><br /><a href="https://www.carisealejandro.com/">CJ Artist</a> • <a href="https://www.seanclark.org/">Sean Clark Artist</a></p>
+		</div>
+		<p id="status">&nbsp;</p>
+
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-178479274-2"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-178479274-2');
+</script>
+
+	</body>
+</html>

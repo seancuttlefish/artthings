@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<title>Picam Monitor</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+	<link rel="apple-touch-icon" href="apple-touch-icon.png">
+	<link rel="icon" href="favicon.ico">
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+	<script type="text/javascript" src="/js/raphael.min.js"></script>
+	<script type="text/javascript" src="/js/mqttws31.min.js"></script>
+	<script type="text/javascript" src="/js/chance.min.js"></script>
+	<script type="text/javascript">
+
+var instanceid = new Chance(Math.random).guid(); // A unique ID for this instance
+console.log("Instance ID: "+instanceid);
+
+componentid = "monitor";
+console.log("Component ID: "+componentid); // The specific componentid 
+
+// artThings
+var SERVERHOST = "iot.artthings.io";
+var SERVERPORT = 8884;
+var useSSL = true;
+console.log(SERVERHOST + ":" + SERVERPORT);
+	
+var state = {
+	'id': instanceid,
+	'ecosystem': 'cybecol',
+	'system': 'webcam',
+	'component': componentid,
+	'packetsin': 0,
+	'packetsout': 0,
+	'ontime': Math.floor(new Date().getTime() / 1000),
+	'uptime': 0,
+	'status': 'ok'
+}
+
+//////////
+// MQTT //
+//////////
+
+var mqttconnected = false;
+var reconnectTimeout = 10000;
+MQTTConnect();
+
+function MQTTConnect() {
+	console.log("Connecting..");
+	$('#information').text("Connecting..");
+	client = new Paho.MQTT.Client(SERVERHOST, SERVERPORT, "web_" + new Date().getTime());
+	client.onConnectionLost = onConnectionLost;
+	client.onMessageArrived = onMessageArrived;
+	client.connect({
+		useSSL: useSSL,
+		timeout: 10,
+		onSuccess: onSuccess,
+		onFailure: onFailure
+	});
+}
+
+function onSuccess() {
+	console.log("MQTT Connection Established " + SERVERHOST + ":" + SERVERPORT);
+	$('#information').text("Connection Established");
+	mqttconnected = true;
+		// Subscribe to core topics
+	client.subscribe(state.ecosystem + "/env/all/hello");
+	client.subscribe(state.ecosystem + "/" + state.system + "/+/movement");
+	client.subscribe(state.ecosystem + "/" + state.system + "/+/image");
+	client.subscribe(state.ecosystem + "/" + state.system + "/+/soundlevel");
+	// Send state
+	sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+}
+
+function onFailure(response) {
+	console.log("MQTT Unable to Connect");
+	$('#information').text("Unable to Connect");
+	mqttconnected = false;
+	setTimeout(MQTTConnect(), reconnectTimeout);
+}
+
+function onConnectionLost(response) {
+	console.log("MQTT Connection Lost");
+	$('#information').text("Connection Lost");
+	mqttconnected = false;
+	setTimeout(MQTTConnect(), reconnectTimeout);
+}
+
+var mt01, mt02, mt03, st01, st02, st03;
+var level01 = 0, maxlevel01 = 0;
+var level02 = 0, maxlevel02 = 0;
+var level03 = 0, maxlevel03 = 0;
+
+function onMessageArrived(message) {
+	// ecology/system/component/event
+	var topics = message.destinationName.split("/");
+	var ecology = topics[0];
+	var system = topics[1];
+	var component = topics[2];
+	var event = topics[3]; // hello, movement, image, soundon, soundoff
+
+	var packet;
+	var sourceid = "";
+	var data = "";
+	try {
+		packet = JSON.parse(message.payloadString);
+		sourceid = packet.sourceid;
+		data = packet.data;
+		if (!sourceid) {
+			sourceid = component;
+			data = message.payloadString;
+		}
+	}
+	catch (e) {
+		sourceid = component;
+		data = message.payloadString;
+	}
+	switch (event) {
+		case 'hello':
+			state.uptime = Math.floor(new Date().getTime() / 1000) - state.ontime;
+			sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+			break;
+		case 'movement':
+			switch (component) {
+				case 'picam01':
+					var rectangles = data.split(":");
+					var rectanglecount = rectangles[0];
+					cam01canvas.clear();
+					clearTimeout(mt01);
+					for (i=0;i<rectangles.length;i++) {
+						var rectangle = rectangles[i].split(",");
+						console.log(rectangle[0]/4,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+						var rect = cam01canvas.rect(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+						rect.attr({
+							stroke: '#0f0',
+							'stroke-width': 2
+						});
+					}
+					mt01 = setTimeout(function() { cam01canvas.clear(); }, 2000);
+					break;
+				case 'picam02':
+					var rectangles = data.split(":");
+					var rectanglecount = rectangles[0];
+					cam02canvas.clear();
+					clearTimeout(mt02);
+					for (i=0;i<rectangles.length;i++) {
+						var rectangle = rectangles[i].split(",");
+						console.log(rectangle[0]/4,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+						var rect = cam02canvas.rect(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/4,rectangle[3]/scale);
+						rect.attr({
+							stroke: '#0f0',
+							'stroke-width': 2
+						});
+					}
+					mt02 = setTimeout(function() { cam02canvas.clear(); }, 2000);
+					break;
+				case 'picam03':
+					var rectangles = data.split(":");
+					var rectanglecount = rectangles[0];
+					cam03canvas.clear();
+					clearTimeout(mt03);
+					for (i=0;i<rectangles.length;i++) {
+						var rectangle = rectangles[i].split(",");
+						console.log(rectangle[0]/4,rectangle[1]/scale,rectangle[2]/scale,rectangle[3]/scale);
+						var rect = cam03canvas.rect(rectangle[0]/scale,rectangle[1]/scale,rectangle[2]/4,rectangle[3]/scale);
+						rect.attr({
+							stroke: '#0f0',
+							'stroke-width': 2
+						});
+					}
+					mt03 = setTimeout(function() { cam03canvas.clear(); }, 2000);
+					break;
+			}
+			break;
+		case 'image':
+			switch (component) {
+				case 'picam01':
+					$('#cam01').css("background-image", 'url('+data.replace(/'/g, '')+')');
+					break;
+				case 'picam02':
+					$('#cam02').css("background-image", 'url('+data.replace(/'/g, '')+')');
+					break;
+				case 'picam03':
+						$('#cam03').css("background-image", 'url('+data.replace(/'/g, '')+')');
+						break;
+			}
+			break;
+		case 'soundlevel':
+			switch (component) {
+				case 'picam01':
+					level01 = parseInt(data);
+					if (level01 > maxlevel01) {
+						maxlevel01 = level01;
+					}
+					var width = (level01/maxlevel01)*320;
+					clearTimeout(st01);
+					$('#sound01').css("width", width);
+					st01 = setTimeout(function() { $('#sound01').css("width", 0); }, 2000);
+					maxlevel01--;
+					if (maxlevel01 < 30) {
+						maxlevel01 = 30;
+					}
+					break;
+				case 'picam02':
+					level02 = parseInt(data);
+					if (level02 > maxlevel02) {
+						maxlevel02 = level02;
+					}
+					var width = (level02/maxlevel02)*320;
+					clearTimeout(st02);
+					$('#sound02').css("width", width);
+					st02 = setTimeout(function() { $('#sound02').css("width", 0); }, 2000);
+					maxlevel02--;
+					if (maxlevel02 < 30) {
+						maxlevel02 = 30;
+					}
+					break;
+				case 'picam03':
+					level03 = parseInt(data);
+					if (level03 > maxlevel03) {
+						maxlevel03 = level03;
+					}
+					var width = (level03/maxlevel03)*320;
+					clearTimeout(st03);
+					$('#sound03').css("width", width);
+					st03 = setTimeout(function() { $('#sound03').css("width", 0); }, 2000);
+					maxlevel03--;
+					if (maxlevel03 < 30) {
+						maxlevel03 = 30;
+					}
+					break;
+			}
+			break;
+	}
+	console.log("MQTT Message Received: " + message.destinationName);
+	state.packetsin++;
+	mqttconnected = true;
+}
+
+function sendmqtt(topic, packet) {
+	var message = new Paho.MQTT.Message(JSON.stringify(packet));
+	message.destinationName = topic;
+	client.send(message);
+	console.log("MQTT Message Sent "+topic);
+	state.packetsout++;
+}
+
+function sendmessage(topic, value) {
+	sendmqtt(state.ecosystem + "/" + state.system + "/" + topic, value);
+}
+
+////////////
+// Canvas //
+////////////
+
+var cam01canvas;
+var cam02canvas;
+var cam03canvas;
+var scale = 2
+
+function createcanvas() {
+	console.log("Creating Canvases");
+	cam01canvas = new Raphael(document.getElementById('cam01'),640/scale,480/scale);
+	cam02canvas = new Raphael(document.getElementById('cam02'),640/scale,480/scale);
+	cam03canvas = new Raphael(document.getElementById('cam03'),640/scale,480/scale);
+}
+	</script>
+
+	<style>
+		body {
+			font-family: sans-serif;
+			background-color: #fff;
+			margin: 10px;
+		}
+		button {
+			margin: 4px 0;
+		}
+		.camera p {
+			font-weight: bold;
+			font-size: 18px;
+		}
+		.camera {
+			padding: 10px 0 0 0;
+		}
+		.camera p {
+			margin: 2px;
+		}
+		#cam01,
+		#cam02,
+		#cam03 {
+			width: 320px;
+			height: 240px;
+			background-color: #000;
+			background-repeat: no-repeat;
+		}
+		#sound01,
+		#sound02,
+		#sound03 {
+			font-size: 10px;
+			width: 0;
+			height; 10px;
+			background-color: #0f0;
+		}
+	</style>
+</head>
+
+<body onload="createcanvas()">
+	<h1>Picam Monitor</h1>
+	<div class="controls">
+		<button onclick="sendmqtt('cybecol/env/webcam/ping','');">Ping</button>
+		<button onclick="sendmqtt('cybecol/env/webcam/hello','');">Hello</button><br />
+		<button onclick="sendmqtt('cybecol/webcam/all/soundon','');">Sound On</button>
+		<button onclick="sendmqtt('cybecol/webcam/all/soundoff','');">Sound Off</button>
+		<button onclick="sendmqtt('cybecol/webcam/all/samplerate',5);">Rate 5</button>
+		<button onclick="sendmqtt('cybecol/webcam/all/samplerate',10);">Rate 10</button>
+		<button onclick="sendmqtt('cybecol/webcam/all/threshold',2);">Thr 2</button>
+		<button onclick="sendmqtt('cybecol/webcam/all/threshold',4);">Thr 4</button>
+		<button onclick="sendmqtt('cybecol/webcam/all/threshold',100);">Thr 100</button><br />
+		<button onclick="sendmqtt('cybecol/webcam/all/zoom',1);">Zoom 1</button>
+		<button onclick="sendmqtt('cybecol/webcam/all/zoom',2);">Zoom 2</button>
+		<button onclick="sendmqtt('cybecol/webcam/all/fps',1);">FPS 1</button>
+		<button onclick="sendmqtt('cybecol/webcam/all/fps',5);">FPS 5</button>
+		<button onclick="sendmqtt('cybecol/webcam/all/mincontourarea',100);">Area 100</button>
+		<button onclick="sendmqtt('cybecol/webcam/all/mincontourarea',500);">Area 500</button>
+		<button onclick="sendmqtt('cybecol/webcam/all/mincontourarea',1000);">Area 1000</button>
+	</div>
+	<div class="cameras">
+		<div class="camera">
+			<p>picam01</p>
+			<div id="cam01"></div>
+			<div id="sound01">&nbsp;</div>
+		</div>
+		<div class="camera">
+			<p>picam02</p>
+			<div id="cam02"></div>
+			<div id="sound02">&nbsp;</div>
+		</div>
+		<div class="camera">
+			<p>picam03</p>
+			<div id="cam03"></div>
+			<div id="sound03">&nbsp;</div>
+		</div>
+	</div>
+	<div id="info">&nbsp;</div>
+</body>
+
+</html>

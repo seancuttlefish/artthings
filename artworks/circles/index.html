@@ -1,0 +1,302 @@
+<!--
+	9th October 2020
+	Sean Clark - Interact Digital Arts
+	interactdigitalarts.uk
+	Circles - Sean Clark
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex">
+	<title>Circles - Sean Clark</title>
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-title" content="Circles">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <script type="text/javascript" src="/js/jquery.min.js"></script>
+  <script type="text/javascript" src="/js/mqttws31.min.js"></script>
+  <script type="text/javascript" src="/js/artsys.js"></script>
+  <script type="text/javascript" src="/js/artthings.js"></script>
+  <script type="text/javascript" src="/js/chance.min.js"></script>
+  <script type="text/javascript" src="/js/raphael/raphael-min.js"></script>
+	<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+	<style type="text/css">
+		body {
+			background-color: #000;
+			-webkit-user-select: none;
+			-webkit-touch-callout: none;
+			cursor: none;
+		}
+		#canvas {
+			position: fixed;
+		}
+	</style>
+	<script type='text/javascript'>
+
+// artThings
+var SERVERHOST = "iot.artthings.io"
+var SERVERPORT = 8884;
+var useSSL = true;
+//var SERVERHOST = "iot.local"
+//var SERVERPORT = 8883;
+//var useSSL = false;
+console.log(SERVERHOST + ":" + SERVERPORT);
+
+var instanceid = new Chance(Math.random).guid(); // A unique ID for this instance
+var componentid = "circles";
+console.log("Instance ID: " + instanceid);
+
+// Cybernetic Ecology Message Parameters
+var state = {
+	"id": instanceid,
+	"ecosystem": "cybecol",
+	"system": componentid,
+	"component": "artwork",
+	"colours": 7,
+	"circlesize": [0, 0, 0, 0, 0, 0, 0],
+	"circleinc": [0.3, 0.5, 0.7, 1.1, 1.3, 1.7, 1.9],
+	"circlecolour": [],
+	"packetsin": 0,
+	"packetsout": 0,
+	"ontime": Math.floor(new Date().getTime() / 1000),
+	"uptime": 0,
+	"status": "ok"
+}
+
+// Parameters
+var screenid = false;
+if (getParameterByName('screen')) {
+	state.id = "circles" + getParameterByName('screen'); // 1, 2, 3, 4 etc.
+	screenid = true;
+}
+var aspectRatio = parseFloat(getParameterByName('aspect')) || 1;
+var palette = parseInt(getParameterByName('palette')) || 0;
+
+var version = "Circles 0.0.1";
+console.log(version);
+console.log(state.id);
+
+//////////
+// MQTT //
+//////////
+
+var mqttconnected = false;
+var reconnectTimeout = 10000;
+MQTTConnect();
+
+function MQTTConnect() {
+	console.log("Connecting..");
+	client = new Paho.MQTT.Client(SERVERHOST, SERVERPORT, "web_" + new Date().getTime());
+	client.onConnectionLost = onConnectionLost;
+	client.onMessageArrived = onMessageArrived;
+	client.connect({
+		useSSL: useSSL,
+		timeout: 10,
+		onSuccess: onSuccess,
+		onFailure: onFailure
+	});
+}
+
+function onSuccess() {
+	console.log("MQTT Connection Established " + SERVERHOST + ":" + SERVERPORT);
+	mqttconnected = true;
+	// Subscribe to Topics
+	client.subscribe(state.ecosystem + "/env/all/hello");
+	client.subscribe(state.ecosystem + "/" + state.system + "/all/hello");
+	client.subscribe(state.ecosystem + "/" + state.system + "/all/ping");
+	client.subscribe(state.ecosystem + "/" + state.system + "/" + state.id + "/hello");
+	client.subscribe(state.ecosystem + "/" + state.system + "/" + state.id + "/ping");
+	client.subscribe(state.ecosystem + "/" + state.system + "/" + state.id + "/hslcolor");
+	// Send State
+	sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+}
+
+function onFailure(response) {
+	console.log("MQTT Unable to Connect");
+	mqttconnected = false;
+	setTimeout(MQTTConnect(), reconnectTimeout);
+}
+
+function onConnectionLost(response) {
+	console.log("MQTT Connection Lost");
+	mqttconnected = false;
+	setTimeout(MQTTConnect(), reconnectTimeout);
+}
+
+function onMessageArrived(message) {
+	// ecology/system/component/event
+	var topics = message.destinationName.split("/");
+	var ecology = topics[0];
+	var system = topics[1];
+	var component = topics[2];
+	var event = topics[3]; // hello
+
+	var packet;
+	var sourceid = "";
+	var data = "";
+	try {
+		packet = JSON.parse(message.payloadString);
+		sourceid = packet.sourceid;
+		data = packet.data;
+	} catch (e) {
+		sourceid = component;
+		data = message.payloadString;
+	}
+
+	switch (event) {
+		case "hello":
+			state.uptime = Math.floor(new Date().getTime() / 1000) - state.ontime;
+			sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/state", state);
+			break;
+		case "ping":
+			break;
+		case "hslcolor":
+			break;
+		case "nocolor":
+			break;
+	}
+	console.log("MQTT Message Received: " + message.destinationName);
+	state.packetsin++;
+	mqttconnected = true;
+}
+
+//////////
+// Main //
+//////////
+
+var paper;
+var canvascreated = false;
+var outerborder = 10;
+var circle = [];
+
+var colours = 7;
+var circlesize = [0, 0, 0, 0, 0, 0, 0];
+var circleinc = [0.3, 0.5, 0.7, 1.1, 1.3, 1.7, 1.9];
+var circlecolour = [];
+
+var canvasw;
+var canvash;
+
+// Generate Starting Colours
+for (var i = 0; i < colours; i++) {
+	circlecolour[i] = getColour(palette);
+}
+
+function drawcanvas() {
+	// Calculate canvas size
+	var screenwidth = window.innerWidth;
+	var screenheight = window.innerHeight;
+	var pixelratio = window.devicePixelRatio || 1;
+
+	if (screenwidth > screenheight) {
+		canvash = screenheight - (outerborder * 2);
+	} else {
+		canvash = screenwidth - (outerborder * 2);
+	}
+	canvasw = canvash;
+
+	if ((canvash < 0) || (canvasw < 0)) {
+		canvash = 0;
+		canvasw = 0;
+	}
+
+	canvast = Math.floor((screenheight - canvash) / 2);
+	canvasl = Math.floor((screenwidth - (canvasw * aspectRatio)) / 2);
+	console.log("ScreenSize: " + screenwidth + "x" + screenheight + "@" + pixelratio + " Canvas: " + (canvasw * aspectRatio) + "x" + canvash);
+
+	// Draw canvas
+	if (canvascreated) {
+		paper.setSize(canvasw * aspectRatio, canvash);
+		$("#canvas").css({
+			"top": canvast,
+			"left": canvasl,
+			"width": canvasw * aspectRatio,
+			"height": canvash
+		});
+		paper.clear();
+	} else {
+		paper = Raphael(document.getElementById("canvas"), canvasw * aspectRatio, canvash);
+		$("#canvas").css({
+			"top": canvast,
+			"left": canvasl,
+			"width": canvasw * aspectRatio,
+			"height": canvash
+		});
+		canvascreated = true;
+	}
+
+	// Create foreground circles
+	for (i = 0; i < circlesize.length; i++) {
+		circle[i] = paper.ellipse((canvasw * aspectRatio) / 2, canvash / 2, circlesize[i] * aspectRatio, circlesize[i]);
+	}
+}
+
+function updatecircle(index) {
+	circlesize[index] += (circleinc[index] / 2);
+
+	if (circlesize[index] > (canvasw / 2) - outerborder) {
+		circleinc[index] = circleinc[index] * -1;
+		circlesize[index] = (canvasw / 2) - outerborder;
+	}
+
+	if (circlesize[index] <= 0) {
+		circlesize[index] = 0;
+		circleinc[index] = Math.round((Math.random(1) + 0.5) * 100) / 100;
+		circle[index].toFront();
+		// circleinc[index] = 0; // Waiting for incoming colour
+
+		// Send Colour
+		var packet = {
+			"sourceid" : state.id,
+			"data" : circlecolour[index].substring(4).replace(/\%/g,'').replace(/[)]/g,'') // Only send H,S.L values
+		}
+		sendmqtt(state.ecosystem + "/" + state.system + "/" + state.component + "/hslcolor", packet);
+		console.log("Circle " + index + " " + circlecolour[index] + " " + circleinc[index]);
+	}
+
+	circle[index].attr({
+		rx: circlesize[index] * aspectRatio,
+		ry: circlesize[index],
+		fill: circlecolour[index].replace('%', ''),
+		stroke: "none",
+		opacity: 0.7
+	});
+}
+
+function mainloop() {
+	for (i = 0; i < circlesize.length; i++) {
+		updatecircle(i);
+	}
+	setTimeout(mainloop, 40);
+}
+
+window.addEventListener("load", function() {
+	// Draw the canvas
+	drawcanvas();
+
+	// Draw the image
+	mainloop();
+});
+
+$(window).resize(function() {
+	// Draw the canvas
+	drawcanvas();
+});
+
+	</script>
+	<body>
+		<div id="canvas"></div>
+		<!-- Global site tag (gtag.js) - Google Analytics -->
+		<script async src="https://www.googletagmanager.com/gtag/js?id=UA-178479274-2"></script>
+		<script>
+			window.dataLayer = window.dataLayer || [];
+			function gtag(){dataLayer.push(arguments);}
+			gtag('js', new Date());
+			gtag('config', 'UA-178479274-2');
+		</script>
+	</body>
+</html>
