@@ -1,7 +1,7 @@
 // Initialize Raphael.js
 const gridSize = 64;  // 64x64 grid
 const spacing = 12;   // Space between circles
-const radius = 5;     // Circle size
+const radius = 6;     // Circle size
 const canvasSize = gridSize * spacing; // Adjust canvas size dynamically
 
 const paper = Raphael("canvas", canvasSize, canvasSize); // Set canvas size dynamically
